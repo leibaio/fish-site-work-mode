@@ -1,0 +1,41 @@
+{
+  "name": "fish-site-work-mode",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "多站点「摸鱼工作模式」：左栏会话/工作目录、中间阅读区、右侧运行日志",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/leibaio/fish-site-work-mode.git"
+  },
+  "homepage": "https://github.com/leibaio/fish-site-work-mode#readme",
+  "bugs": {
+    "url": "https://github.com/leibaio/fish-site-work-mode/issues"
+  },
+  "keywords": [
+    "tampermonkey",
+    "userscript",
+    "linux.do",
+    "discourse",
+    "work-mode",
+    "wechat"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node packages/build/build.mjs linuxdo",
+    "build:linuxdo": "node packages/build/build.mjs linuxdo",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "jsdom": "^26.0.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0"
+  }
+}

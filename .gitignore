@@ -1,0 +1,12 @@
+node_modules/
+coverage/
+.vitest/
+.DS_Store
+.idea/
+.vscode/
+*.log
+*.local
+.env
+.env.*
+*.bak
+*.restore.js
