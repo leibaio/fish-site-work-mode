@@ -99,6 +99,17 @@ export const STYLES = `
 .fs-post-time { margin-left: auto; color: #b3b3b3; }
 .fs-post-body { color: #222; font-size: 16px; line-height: 1.85; overflow-wrap: anywhere; }
 .fs-post-body p { margin: 0 0 1em; }
+.fs-post-body h1, .fs-post-body h2, .fs-post-body h3, .fs-post-body h4, .fs-post-body h5, .fs-post-body h6 {
+  margin: 1.2em 0 .5em; line-height: 1.4; font-weight: 600;
+}
+.fs-post-body h1 { font-size: 1.5em; }
+.fs-post-body h2 { font-size: 1.3em; }
+.fs-post-body h3 { font-size: 1.15em; }
+.fs-post-body ul, .fs-post-body ol { margin: .6em 0 .8em 1.4em; }
+.fs-post-body li { margin: .2em 0; }
+.fs-post-body hr { border: 0; border-top: 1px solid #eee; margin: 1.2em 0; }
+.fs-post-body figure { margin: 1em 0; }
+.fs-post-body figcaption { margin-top: 6px; color: #999; font-size: 12px; text-align: center; }
 .fs-post-body img { max-width: 100%; height: auto; border-radius: 4px; }
 .fs-post-body video { max-width: 100%; height: auto; border-radius: 4px; }
 .fs-post-body pre {
@@ -194,6 +205,7 @@ export const STYLES = `
 .fs-ft-sh { background: #2f9e44; }
 .fs-ft-json { background: #8a8f98; }
 .fs-ft-sql { background: #336791; }
+.fs-ft-py { background: #3776ab; }
 .fs-ft-txt { background: #b0b5bd; }
 .fs-git { flex: 0 0 auto; margin-left: 2px; font: 10px Consolas, monospace; }
 .fs-git-m { color: #d19a66; }

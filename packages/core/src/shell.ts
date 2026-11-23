@@ -100,6 +100,7 @@ function fileBadge(name: string): { label: string; cls: string } {
     sh: ["SH", "sh"],
     json: ["{}", "json"],
     sql: ["SQL", "sql"],
+    py: ["PY", "py"],
     xml: ["X", "txt"],
     toml: ["T", "txt"],
   };

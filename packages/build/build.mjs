@@ -28,6 +28,16 @@ const sites = {
     matches: ["https://bbs.hupu.com/*"],
     description: "把虎扑步行街变成工作台：左栏帖子、中间阅读区、右侧运行日志，支持工作目录伪装。",
   },
+  zhihu: {
+    name: "工作台 · 知乎",
+    matches: ["https://zhihu.com/*", "https://www.zhihu.com/*"],
+    description: "把知乎变成工作台：左栏回答/推荐、中间阅读区、右侧运行日志，支持工作目录伪装。",
+  },
+  weibo: {
+    name: "工作台 · 微博",
+    matches: ["https://weibo.com/*", "https://www.weibo.com/*"],
+    description: "把微博变成工作台：左栏微博、中间阅读区、右侧运行日志，支持工作目录伪装。",
+  },
 };
 
 const meta = sites[site];

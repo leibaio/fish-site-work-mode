@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         工作台 · Chiphell
 // @namespace    fish-site-work-mode
-// @version      0.4.0
+// @version      0.5.0
 // @description  把 Chiphell 变成工作台：左栏帖子、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT
@@ -219,6 +219,17 @@
 .fs-post-time { margin-left: auto; color: #b3b3b3; }
 .fs-post-body { color: #222; font-size: 16px; line-height: 1.85; overflow-wrap: anywhere; }
 .fs-post-body p { margin: 0 0 1em; }
+.fs-post-body h1, .fs-post-body h2, .fs-post-body h3, .fs-post-body h4, .fs-post-body h5, .fs-post-body h6 {
+  margin: 1.2em 0 .5em; line-height: 1.4; font-weight: 600;
+}
+.fs-post-body h1 { font-size: 1.5em; }
+.fs-post-body h2 { font-size: 1.3em; }
+.fs-post-body h3 { font-size: 1.15em; }
+.fs-post-body ul, .fs-post-body ol { margin: .6em 0 .8em 1.4em; }
+.fs-post-body li { margin: .2em 0; }
+.fs-post-body hr { border: 0; border-top: 1px solid #eee; margin: 1.2em 0; }
+.fs-post-body figure { margin: 1em 0; }
+.fs-post-body figcaption { margin-top: 6px; color: #999; font-size: 12px; text-align: center; }
 .fs-post-body img { max-width: 100%; height: auto; border-radius: 4px; }
 .fs-post-body video { max-width: 100%; height: auto; border-radius: 4px; }
 .fs-post-body pre {
@@ -314,6 +325,7 @@
 .fs-ft-sh { background: #2f9e44; }
 .fs-ft-json { background: #8a8f98; }
 .fs-ft-sql { background: #336791; }
+.fs-ft-py { background: #3776ab; }
 .fs-ft-txt { background: #b0b5bd; }
 .fs-git { flex: 0 0 auto; margin-left: 2px; font: 10px Consolas, monospace; }
 .fs-git-m { color: #d19a66; }
@@ -454,6 +466,7 @@
       sh: ["SH", "sh"],
       json: ["{}", "json"],
       sql: ["SQL", "sql"],
+      py: ["PY", "py"],
       xml: ["X", "txt"],
       toml: ["T", "txt"]
     };
@@ -1148,7 +1161,7 @@
     if (text.includes("前天")) return Date.now() - 1728e5;
     return 0;
   }
-  function absoluteUrl(value, base) {
+  function absoluteUrl2(value, base) {
     const raw = String(value || "").trim();
     if (!raw || raw.startsWith("data:")) return "";
     try {
@@ -1163,7 +1176,7 @@
       const real = image.getAttribute("zoomfile") || image.getAttribute("file") || image.getAttribute("data-original");
       if (real) image.setAttribute("src", real);
       const src = image.getAttribute("src");
-      if (src) image.setAttribute("src", absoluteUrl(src, baseUrl));
+      if (src) image.setAttribute("src", absoluteUrl2(src, baseUrl));
       image.removeAttribute("file");
       image.removeAttribute("zoomfile");
       image.removeAttribute("data-original");
@@ -1171,7 +1184,7 @@
     doc.querySelectorAll("a[href]").forEach((anchor) => {
       const href = anchor.getAttribute("href");
       if (!href || href.startsWith("#") || href.toLowerCase().startsWith("javascript:")) return;
-      const absolute = absoluteUrl(href, baseUrl);
+      const absolute = absoluteUrl2(href, baseUrl);
       if (absolute) anchor.setAttribute("href", absolute);
     });
     return sanitizeCooked(doc.body ? doc.body.innerHTML : "");
@@ -1217,7 +1230,7 @@
     return posts.map((post, index) => {
       const author = normalize(post.querySelector(".authi a.xw1")?.textContent) || "匿名用户";
       const avatarSrc = post.querySelector(".avatar img")?.getAttribute("src") || post.querySelector(".avatar img")?.getAttribute("file") || "";
-      const avatar = absoluteUrl(avatarSrc, baseUrl);
+      const avatar = absoluteUrl2(avatarSrc, baseUrl);
       const floor = normalize(post.querySelector('[id^="postnum"] em')?.textContent) || String(index + 1);
       const timeText = normalize(post.querySelector('[id^="authorposton"]')?.textContent);
       const contentElement = post.querySelector('td.t_f[id^="postmessage_"]') || post.querySelector(".t_f");

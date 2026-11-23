@@ -20,7 +20,7 @@
 - **中间**：阅读区（正文、帖子、文档）
 - **右侧**：持续滚动的运行日志
 
-目前已实现四个站点适配器：**linux.do**、**V2EX**、**Chiphell**、**虎扑**。其余站点（小红书、知乎、微博）共用 `packages/core`，按 `docs/MODE-BLUEPRINT.md` 里的适配器接口逐个补齐即可。
+目前已实现六个站点适配器：**linux.do**、**V2EX**、**Chiphell**、**虎扑**、**知乎**、**微博**。剩余 **小红书** 共用 `packages/core`，按 `docs/MODE-BLUEPRINT.md` 里的适配器接口补齐即可。
 
 ---
 
@@ -38,25 +38,26 @@
 
 - 点击左上角「微信」字样，切换成「工作目录」
 - 左栏变成 IDE 风格文件树：workspace、分支下拉、文件类型徽标、Git 修改标记
-- 顶栏文档名变成各站点自己的假文档（linux.do 为 `community-spec.pdf`，V2EX 为 `content-spec.pdf`，Chiphell 为 `hardware-spec.pdf`，虎扑为 `sports-spec.pdf`），浏览器标签标题和 favicon 同步替换
+- 顶栏文档名变成各站点自己的假文档（linux.do 为 `community-spec.pdf`，V2EX 为 `content-spec.pdf`，Chiphell 为 `hardware-spec.pdf`，虎扑为 `sports-spec.pdf`，知乎为 `research-notes.pdf`，微博为 `media-spec.pdf`），浏览器标签标题和 favicon 同步替换
 - 再点一次恢复原来的会话列表和页面标题
 
 伪装只是本地视觉层，不会修改任何服务端数据，也不会影响你在站点上的真实账号状态。
 
 ### 阅读
 
-- 打开 linux.do 话题 / V2EX 主题 / Chiphell 帖子 / 虎扑帖子时，自动读取当前内容；从首页或版块页进入时展示最近帖子
+- 打开 linux.do 话题 / V2EX 主题 / Chiphell 帖子 / 虎扑帖子 / 知乎问题 / 微博时间线时，自动读取当前内容
 - 帖子按楼层排序，保留站点正文 HTML（代码块、引用、图片、表格、视频、链接）
 - 站内话题链接点击后，在本工作台内切换，不跳出页面
 - linux.do 长话题（超过首屏 20 楼）底部提供「加载更多回复」，分批拉取
 - V2EX 通过公开 API 一次性读取主题与全部回复
 - Chiphell 按 Discuz 分页加载后续楼层，每页约 30 帖
 - 虎扑按帖子分页加载后续楼层，每页约 20 回复
+- **知乎 / 微博使用 live DOM 模式**：只读取当前页面已经渲染出来的回答、推荐卡片或微博，不伪造签名、不请求未授权的跨页数据
 - 站内链接默认新标签打开，不打断当前阅读
 
 ### 日志
 
-- linux.do / V2EX / Chiphell / 虎扑版本默认使用本地模拟日志（通用的服务运行日志，不包含任何真实业务数据）
+- 六个站点版本默认使用本地模拟日志（通用的服务运行日志，不包含任何真实业务数据）
 - 日志区域在「只看日志」模式下会占满屏幕，适合把窗口摆在工位上
 - 日志上限 400 行，自动滚动到底部
 
@@ -72,8 +73,10 @@
    - V2EX：[dist/v2ex-work-mode.user.js](https://github.com/leibaio/fish-site-work-mode/raw/main/dist/v2ex-work-mode.user.js)
    - Chiphell：[dist/chiphell-work-mode.user.js](https://github.com/leibaio/fish-site-work-mode/raw/main/dist/chiphell-work-mode.user.js)
    - 虎扑：[dist/hupu-work-mode.user.js](https://github.com/leibaio/fish-site-work-mode/raw/main/dist/hupu-work-mode.user.js)
+   - 知乎：[dist/zhihu-work-mode.user.js](https://github.com/leibaio/fish-site-work-mode/raw/main/dist/zhihu-work-mode.user.js)
+   - 微博：[dist/weibo-work-mode.user.js](https://github.com/leibaio/fish-site-work-mode/raw/main/dist/weibo-work-mode.user.js)
 3. Tampermonkey 弹出安装页后点「安装」
-4. 打开对应站点（<https://linux.do/>、<https://www.v2ex.com/>、<https://www.chiphell.com/> 或 <https://bbs.hupu.com/>），脚本会自动接管
+4. 打开对应站点（<https://linux.do/>、<https://www.v2ex.com/>、<https://www.chiphell.com/>、<https://bbs.hupu.com/>、<https://www.zhihu.com/> 或 <https://weibo.com/>），脚本会自动接管
 
 脚本头里已经写入 `@updateURL` / `@downloadURL`，之后发新版本时 Tampermonkey 会自动检查更新。
 
@@ -86,7 +89,7 @@ npm install
 npm run build
 ```
 
-产物：`dist/linuxdo-work-mode.user.js`、`dist/v2ex-work-mode.user.js`、`dist/chiphell-work-mode.user.js`、`dist/hupu-work-mode.user.js`。也可以打开 Tampermonkey 面板 →「添加新脚本」，把对应产物全文粘贴进去。
+产物：`dist/*.user.js`（linux.do、V2EX、Chiphell、虎扑、知乎、微博）。也可以打开 Tampermonkey 面板 →「添加新脚本」，把对应产物全文粘贴进去。
 
 ### 开发命令
 
@@ -99,6 +102,8 @@ npm run build:linuxdo  # 只构建 linux.do
 npm run build:v2ex     # 只构建 V2EX
 npm run build:chiphell # 只构建 Chiphell
 npm run build:hupu     # 只构建虎扑
+npm run build:zhihu    # 只构建知乎
+npm run build:weibo    # 只构建微博
 npm run check          # typecheck + test + build
 ```
 
@@ -128,6 +133,12 @@ packages/
     hupu/               # 虎扑（BBS）适配器
       src/adapter.ts    # 步行街列表、帖子楼层、分页、视频/引用
       src/index.ts      # 入口：startApp(hupuAdapter, hupuCoverStory)
+    zhihu/              # 知乎（live DOM）适配器
+      src/adapter.ts    # 回答列表、问题页、推荐卡片
+      src/index.ts      # 入口：startApp(zhihuAdapter, zhihuCoverStory)
+    weibo/              # 微博（live DOM）适配器
+      src/adapter.ts    # 时间线卡片、状态详情、图片/视频
+      src/index.ts      # 入口：startApp(weiboAdapter, weiboCoverStory)
   build/
     build.mjs           # esbuild 打包 + 用户脚本头
 tests/
@@ -135,6 +146,8 @@ tests/
   v2ex-adapter.test.ts
   chiphell-adapter.test.ts
   hupu-adapter.test.ts
+  zhihu-adapter.test.ts
+  weibo-adapter.test.ts
   core.test.ts
   utils.test.ts
 docs/
@@ -144,6 +157,8 @@ dist/
   v2ex-work-mode.user.js
   chiphell-work-mode.user.js
   hupu-work-mode.user.js
+  zhihu-work-mode.user.js
+  weibo-work-mode.user.js
 ```
 
 ---
@@ -188,6 +203,15 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 | 帖子详情 | `GET /<tid>.html` |
 | 后续楼层 | `GET /<tid>-<page>.html` |
 
+### 知乎 / 微博
+
+这两个站点使用 **live DOM 模式**：脚本不主动请求站点的签名接口，也不伪造 `x-zse-96` / XSRF；只读取当前页面已经渲染出来的内容。
+
+- 知乎：识别 `/question/<id>` 下的 `.AnswerItem` / `.RichText` / `.AuthorInfo`，以及首页的 `TopstoryItem` / `FeedItem`
+- 微博：识别 `article`、`[mid]`、`[data-mid]`、`Feed_wrap` 等时间线卡片，读取正文、作者、头像、图片、视频和转发内容
+- 需要先在页面里登录并让内容加载完成；脚本会在挂载后等待最多 6–8 秒
+- 当前页面没有渲染出来的回答/微博不会主动抓取，翻页/无限滚动也不接管
+
 如果接口因未登录、权限、Cloudflare 验证、限频等原因失败，阅读区会显示错误提示，不会静默吞掉，也不会绕过站点权限。
 
 ---
@@ -216,9 +240,9 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 | V2EX | ✅ 可用 | 公开 JSON API，主题 + 全部回复 |
 | Chiphell | ✅ 可用 | Discuz，版块/帖子 HTML + 分页 |
 | 虎扑 | ✅ 可用 | BBS HTML，步行街列表 + 帖子分页 |
-| 小红书 | 计划 | 需要处理签名接口，优先 DOM 路线 |
-| 知乎 | 计划 | 登录态严格，建议只读 DOM |
-| 微博 | 计划 | 信息流结构变化频繁，需要容错 |
+| 知乎 | ✅ 可用（live DOM） | 问题回答 / 首页推荐，只读当前页面已渲染内容 |
+| 微博 | ✅ 可用（live DOM） | 时间线 / 状态详情，只读当前页面已渲染内容 |
+| 小红书 | 计划 | 需要处理签名接口，优先 DOM + 隐藏详情页路线 |
 
 ---
 
@@ -229,6 +253,8 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 - V2EX 的回复由公开 API 一次性返回；超长主题如果被服务端截断，工作台不会自动补页
 - Chiphell 在首页使用默认版块「电脑讨论(新)」（fid=146）；帖子页会跟随当前帖子所在版块
 - 虎扑默认支持步行街主干道（`/bxj`、`/topic-daily`）；帖子页会尝试跟随面包屑里的父版块
+- 知乎 / 微博是 **live DOM**：只能读当前页面已经渲染出来的内容，翻页或无限滚动不会自动接管；未登录或内容未加载时会显示加载失败
+- 知乎文章（`zhuanlan.zhihu.com`）和微博移动版（`m.weibo.cn`）暂未接入，目前分别支持问答/推荐页和 `weibo.com` 时间线
 - Chiphell / 虎扑部分版块或附件需要登录才能查看，权限不足时会显示加载失败
 - 伪装只覆盖前端，不改变浏览器历史记录里的真实 URL
 - 站点改版、接口限频或反爬策略变化后，对应适配器可能需要同步调整
@@ -252,12 +278,12 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 # 1. 修改 package.json 的 version，并更新 CHANGELOG.md
 npm run check
 git add dist package.json CHANGELOG.md
-git commit -m "chore: release v0.4.1"
-git tag v0.4.1
+git commit -m "chore: release v0.5.1"
+git tag v0.5.1
 git push origin main --tags
 ```
 
-CI 会校验提交的 `dist` 与源码构建结果一致。也可以在 GitHub Releases 里附上四个 `.user.js` 作为附件。
+CI 会校验提交的 `dist` 与源码构建结果一致。也可以在 GitHub Releases 里附上六个 `.user.js` 作为附件。
 
 ---
 
@@ -268,6 +294,7 @@ CI 会校验提交的 `dist` 与源码构建结果一致。也可以在 GitHub R
 - [V2EX](https://www.v2ex.com/)：公开 JSON API 的社区，第二个适配对象
 - [Chiphell](https://www.chiphell.com/)：Discuz 论坛，第三个适配对象
 - [虎扑](https://bbs.hupu.com/)：BBS 社区，第四个适配对象
+- [知乎](https://www.zhihu.com/) / [微博](https://weibo.com/)：live DOM 读取，第五、第六个适配对象
 - 多站点架构与路线设计见 [docs/MODE-BLUEPRINT.md](docs/MODE-BLUEPRINT.md)
 
 ## License

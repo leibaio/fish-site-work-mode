@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.5.0 — 2026-11-23
+
+新增知乎、微博 live DOM 适配器。
+
+### 新增
+
+- 知乎（live DOM）适配器：
+  - 问题页 `/question/<qid>`：读取当前已渲染的回答列表、作者、头像、赞同数、时间
+  - 回答页 `/question/<qid>/answer/<aid>`：优先打开 URL 指定回答
+  - 首页 `/`、`/hot`：读取 TopstoryItem / FeedItem 推荐卡片
+  - 不伪造 `x-zse-96`，不请求未授权的跨页数据
+- 微博（live DOM）适配器：
+  - 首页 `/`、`/hot`、个人页、状态详情：读取已经渲染的时间线卡片
+  - 解析正文、作者、头像、图片、视频、转发内容
+  - 不伪造 XSRF，不请求未授权的跨页数据
+- 新增公共 DOM 工具：`waitForSelector`、`firstText`、`topLevel`、`cleanElement`、`absolutizeMedia`、`parseCount`
+- 知乎工作伪装：`research-service`、Python 文件树、`research-notes.pdf`
+- 微博工作伪装：`media-service`、TypeScript 文件树、`media-spec.pdf`
+- 正文样式补充标题、列表、分隔线、figure、video
+- 构建脚本支持六个站点，CI 校验并上传全部产物
+- 新增知乎、微博适配器测试，测试总数 31
+
+### 说明
+
+- 知乎/微博只读取当前页面已经渲染出来的内容；翻页、无限滚动和登录墙不会自动接管
+
 ## 0.4.0 — 2026-11-23
 
 新增虎扑适配器。

@@ -487,7 +487,7 @@ wm:global:loglevel
 3. 用 **linux.do** 做第一个新适配器（Discourse JSON 最简单）。
 4. 用 **V2EX** 验证公开 JSON API + 主题/回复模型。
 5. **Chiphell** 与 **虎扑** 已按 HTML + 分页完成。
-6. 知乎/微博：先做 DOM/页面自有请求，不碰签名。
+6. **知乎 / 微博** 已按 live DOM + 页面自有内容完成，不碰签名。
 7. 小红书：直接参考 `xhs-wechat-mode` 的 feed DOM + 隐藏 iframe。
 
 ---
