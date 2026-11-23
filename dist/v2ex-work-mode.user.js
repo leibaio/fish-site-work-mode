@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         工作台 · V2EX
 // @namespace    fish-site-work-mode
-// @version      0.5.0
+// @version      0.6.0
 // @description  把 V2EX 变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT
@@ -863,10 +863,11 @@
         toast(`话题列表加载失败：${state.listError}`);
       }
       renderSidebar();
-      const preferred = adapter.initialConversationId?.(ctx) || store.get("lastId", "");
+      const autoOpen = adapter.autoOpenFirst !== false;
+      const preferred = adapter.initialConversationId?.(ctx) || (autoOpen ? store.get("lastId", "") : "");
       const inList = preferred && state.conversations.some((conversation) => conversation.id === preferred);
       const first = state.conversations[0]?.id ?? "";
-      const id = inList ? preferred : preferred || first;
+      const id = inList ? preferred : autoOpen ? preferred || first : preferred;
       if (id) {
         await openConversation(id);
       } else {

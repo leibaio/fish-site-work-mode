@@ -20,7 +20,7 @@
 - **中间**：阅读区（正文、帖子、文档）
 - **右侧**：持续滚动的运行日志
 
-目前已实现六个站点适配器：**linux.do**、**V2EX**、**Chiphell**、**虎扑**、**知乎**、**微博**。剩余 **小红书** 共用 `packages/core`，按 `docs/MODE-BLUEPRINT.md` 里的适配器接口补齐即可。
+目前已实现七个站点适配器：**linux.do**、**V2EX**、**Chiphell**、**虎扑**、**知乎**、**微博**、**豆瓣小组**。剩余 **小红书** 共用 `packages/core`，按 `docs/MODE-BLUEPRINT.md` 里的适配器接口补齐即可。
 
 ---
 
@@ -38,7 +38,7 @@
 
 - 点击左上角「微信」字样，切换成「工作目录」
 - 左栏变成 IDE 风格文件树：workspace、分支下拉、文件类型徽标、Git 修改标记
-- 顶栏文档名变成各站点自己的假文档（linux.do 为 `community-spec.pdf`，V2EX 为 `content-spec.pdf`，Chiphell 为 `hardware-spec.pdf`，虎扑为 `sports-spec.pdf`，知乎为 `research-notes.pdf`，微博为 `media-spec.pdf`），浏览器标签标题和 favicon 同步替换
+- 顶栏文档名变成各站点自己的假文档（linux.do 为 `community-spec.pdf`，V2EX 为 `content-spec.pdf`，Chiphell 为 `hardware-spec.pdf`，虎扑为 `sports-spec.pdf`，知乎为 `research-notes.pdf`，微博为 `media-spec.pdf`，豆瓣为 `editorial-notes.pdf`），浏览器标签标题和 favicon 同步替换
 - 再点一次恢复原来的会话列表和页面标题
 
 伪装只是本地视觉层，不会修改任何服务端数据，也不会影响你在站点上的真实账号状态。
@@ -53,11 +53,12 @@
 - Chiphell 按 Discuz 分页加载后续楼层，每页约 30 帖
 - 虎扑按帖子分页加载后续楼层，每页约 20 回复
 - **知乎 / 微博使用 live DOM 模式**：只读取当前页面已经渲染出来的回答、推荐卡片或微博，不伪造签名、不请求未授权的跨页数据
+- **豆瓣小组**：`/group/` 读取讨论精选卡片；`/group/topic/<id>/` 读取楼主 + 回复楼层；从精选页打开话题时会先尝试同源 fetch，失败则跳转到话题页由 live DOM 接管
 - 站内链接默认新标签打开，不打断当前阅读
 
 ### 日志
 
-- 六个站点版本默认使用本地模拟日志（通用的服务运行日志，不包含任何真实业务数据）
+- 七个站点版本默认使用本地模拟日志（通用的服务运行日志，不包含任何真实业务数据）
 - 日志区域在「只看日志」模式下会占满屏幕，适合把窗口摆在工位上
 - 日志上限 400 行，自动滚动到底部
 
@@ -75,8 +76,9 @@
    - 虎扑：[dist/hupu-work-mode.user.js](https://github.com/leibaio/fish-site-work-mode/raw/main/dist/hupu-work-mode.user.js)
    - 知乎：[dist/zhihu-work-mode.user.js](https://github.com/leibaio/fish-site-work-mode/raw/main/dist/zhihu-work-mode.user.js)
    - 微博：[dist/weibo-work-mode.user.js](https://github.com/leibaio/fish-site-work-mode/raw/main/dist/weibo-work-mode.user.js)
+   - 豆瓣：[dist/douban-work-mode.user.js](https://github.com/leibaio/fish-site-work-mode/raw/main/dist/douban-work-mode.user.js)
 3. Tampermonkey 弹出安装页后点「安装」
-4. 打开对应站点（<https://linux.do/>、<https://www.v2ex.com/>、<https://www.chiphell.com/>、<https://bbs.hupu.com/>、<https://www.zhihu.com/> 或 <https://weibo.com/>），脚本会自动接管
+4. 打开对应站点（<https://linux.do/>、<https://www.v2ex.com/>、<https://www.chiphell.com/>、<https://bbs.hupu.com/>、<https://www.zhihu.com/>、<https://weibo.com/> 或 <https://www.douban.com/group/>），脚本会自动接管
 
 脚本头里已经写入 `@updateURL` / `@downloadURL`，之后发新版本时 Tampermonkey 会自动检查更新。
 
@@ -89,7 +91,7 @@ npm install
 npm run build
 ```
 
-产物：`dist/*.user.js`（linux.do、V2EX、Chiphell、虎扑、知乎、微博）。也可以打开 Tampermonkey 面板 →「添加新脚本」，把对应产物全文粘贴进去。
+产物：`dist/*.user.js`（linux.do、V2EX、Chiphell、虎扑、知乎、微博、豆瓣）。也可以打开 Tampermonkey 面板 →「添加新脚本」，把对应产物全文粘贴进去。
 
 ### 开发命令
 
@@ -104,6 +106,7 @@ npm run build:chiphell # 只构建 Chiphell
 npm run build:hupu     # 只构建虎扑
 npm run build:zhihu    # 只构建知乎
 npm run build:weibo    # 只构建微博
+npm run build:douban   # 只构建豆瓣
 npm run check          # typecheck + test + build
 ```
 
@@ -139,6 +142,9 @@ packages/
     weibo/              # 微博（live DOM）适配器
       src/adapter.ts    # 时间线卡片、状态详情、图片/视频
       src/index.ts      # 入口：startApp(weiboAdapter, weiboCoverStory)
+    douban/             # 豆瓣小组适配器
+      src/adapter.ts    # 讨论精选、话题楼主/回复、同源 fetch + 导航回退
+      src/index.ts      # 入口：startApp(doubanAdapter, doubanCoverStory)
   build/
     build.mjs           # esbuild 打包 + 用户脚本头
 tests/
@@ -148,6 +154,7 @@ tests/
   hupu-adapter.test.ts
   zhihu-adapter.test.ts
   weibo-adapter.test.ts
+  douban-adapter.test.ts
   core.test.ts
   utils.test.ts
 docs/
@@ -159,6 +166,7 @@ dist/
   hupu-work-mode.user.js
   zhihu-work-mode.user.js
   weibo-work-mode.user.js
+  douban-work-mode.user.js
 ```
 
 ---
@@ -212,6 +220,16 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 - 需要先在页面里登录并让内容加载完成；脚本会在挂载后等待最多 6–8 秒
 - 当前页面没有渲染出来的回答/微博不会主动抓取，翻页/无限滚动也不接管
 
+### 豆瓣小组
+
+| 用途 | 路线 |
+| --- | --- |
+| 讨论精选列表 | `/group/` 的 `.channel-item` 卡片（live DOM） |
+| 话题楼主 + 回复 | `/group/topic/<id>/` 的 `.topic-content` / `.comment-item`（live DOM） |
+| 从精选打开话题 | 先同源 `fetch('/group/topic/<id>/')` 解析；失败则跳转到话题页，由 live DOM 接管 |
+
+豆瓣对未登录/自动化请求比较严格；如果话题页返回 403 或登录页，阅读区会显示错误，不会绕过限制。
+
 如果接口因未登录、权限、Cloudflare 验证、限频等原因失败，阅读区会显示错误提示，不会静默吞掉，也不会绕过站点权限。
 
 ---
@@ -242,6 +260,7 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 | 虎扑 | ✅ 可用 | BBS HTML，步行街列表 + 帖子分页 |
 | 知乎 | ✅ 可用（live DOM） | 问题回答 / 首页推荐，只读当前页面已渲染内容 |
 | 微博 | ✅ 可用（live DOM） | 时间线 / 状态详情，只读当前页面已渲染内容 |
+| 豆瓣小组 | ✅ 可用（live DOM） | 讨论精选 / 话题楼主+回复；话题页优先 live DOM |
 | 小红书 | 计划 | 需要处理签名接口，优先 DOM + 隐藏详情页路线 |
 
 ---
@@ -255,6 +274,8 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 - 虎扑默认支持步行街主干道（`/bxj`、`/topic-daily`）；帖子页会尝试跟随面包屑里的父版块
 - 知乎 / 微博是 **live DOM**：只能读当前页面已经渲染出来的内容，翻页或无限滚动不会自动接管；未登录或内容未加载时会显示加载失败
 - 知乎文章（`zhuanlan.zhihu.com`）和微博移动版（`m.weibo.cn`）暂未接入，目前分别支持问答/推荐页和 `weibo.com` 时间线
+- 豆瓣目前支持 `/group/` 讨论精选和 `/group/topic/<id>/` 话题页；具体小组页 `/group/<gid>/`、电影/图书/音乐条目页暂未接管
+- 豆瓣从精选页打开话题时，如果同源 fetch 被 403/登录墙拦截，会跳转到话题页，由 live DOM 重新接管
 - Chiphell / 虎扑部分版块或附件需要登录才能查看，权限不足时会显示加载失败
 - 伪装只覆盖前端，不改变浏览器历史记录里的真实 URL
 - 站点改版、接口限频或反爬策略变化后，对应适配器可能需要同步调整
@@ -278,12 +299,12 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 # 1. 修改 package.json 的 version，并更新 CHANGELOG.md
 npm run check
 git add dist package.json CHANGELOG.md
-git commit -m "chore: release v0.5.1"
-git tag v0.5.1
+git commit -m "chore: release v0.6.1"
+git tag v0.6.1
 git push origin main --tags
 ```
 
-CI 会校验提交的 `dist` 与源码构建结果一致。也可以在 GitHub Releases 里附上六个 `.user.js` 作为附件。
+CI 会校验提交的 `dist` 与源码构建结果一致。也可以在 GitHub Releases 里附上七个 `.user.js` 作为附件。
 
 ---
 
@@ -295,6 +316,7 @@ CI 会校验提交的 `dist` 与源码构建结果一致。也可以在 GitHub R
 - [Chiphell](https://www.chiphell.com/)：Discuz 论坛，第三个适配对象
 - [虎扑](https://bbs.hupu.com/)：BBS 社区，第四个适配对象
 - [知乎](https://www.zhihu.com/) / [微博](https://weibo.com/)：live DOM 读取，第五、第六个适配对象
+- [豆瓣小组](https://www.douban.com/group/)：讨论精选 + 话题楼层，第七个适配对象
 - 多站点架构与路线设计见 [docs/MODE-BLUEPRINT.md](docs/MODE-BLUEPRINT.md)
 
 ## License

@@ -573,10 +573,13 @@ export async function startApp(
     }
     renderSidebar();
 
-    const preferred = adapter.initialConversationId?.(ctx as SiteContext) || store.get<string>("lastId", "");
+    const autoOpen = adapter.autoOpenFirst !== false;
+    const preferred =
+      adapter.initialConversationId?.(ctx as SiteContext) ||
+      (autoOpen ? store.get<string>("lastId", "") : "");
     const inList = preferred && state.conversations.some((conversation) => conversation.id === preferred);
     const first = state.conversations[0]?.id ?? "";
-    const id = inList ? preferred : preferred || first;
+    const id = inList ? preferred : autoOpen ? preferred || first : preferred;
     if (id) {
       await openConversation(id);
     } else {

@@ -38,6 +38,16 @@ const sites = {
     matches: ["https://weibo.com/*", "https://www.weibo.com/*"],
     description: "把微博变成工作台：左栏微博、中间阅读区、右侧运行日志，支持工作目录伪装。",
   },
+  douban: {
+    name: "工作台 · 豆瓣",
+    matches: [
+      "https://www.douban.com/group/*",
+      "https://douban.com/group/*",
+      "https://www.douban.com/group",
+      "https://douban.com/group",
+    ],
+    description: "把豆瓣小组变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。",
+  },
 };
 
 const meta = sites[site];

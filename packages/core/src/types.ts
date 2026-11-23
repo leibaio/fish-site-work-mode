@@ -78,6 +78,8 @@ export interface SiteAdapter {
   openConversation(id: string): Promise<ContentView>;
   loadMore?(id: string, cursor: unknown): Promise<LoadMoreResult>;
   initialConversationId?(ctx: SiteContext): string | null;
+  /** 是否在列表加载后自动打开第一条会话，默认 true */
+  autoOpenFirst?: boolean;
   conversationIdFromUrl?(url: URL): string | null;
   createLogProvider?(): LogProvider | null;
 }

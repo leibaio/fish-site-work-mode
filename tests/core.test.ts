@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { startApp, type AppHandle, type CoverStory, type SiteAdapter } from "../packages/core/src";
 
 const coverStory: CoverStory = {
@@ -128,5 +128,23 @@ describe("core shell", () => {
     await waitFor(() => opened.length === 1);
     expect(opened[0]).toBe("99");
     expect(shadow.querySelector(".fs-head-title")?.textContent).toBe("Topic 99");
+  });
+
+  it("can skip auto-opening the first conversation", async () => {
+    const adapter = mockAdapter();
+    adapter.autoOpenFirst = false;
+    const opened = vi.fn(async () => ({
+      title: "Unused",
+      html: "<p>unused</p>",
+      hasMore: false,
+    }));
+    adapter.openConversation = opened;
+
+    handle = await startApp(adapter, coverStory);
+    const shadow = handle!.shadow;
+    await waitFor(() => !!shadow.querySelector(".fs-item-title"));
+
+    expect(opened).not.toHaveBeenCalled();
+    expect(shadow.querySelector(".fs-content")?.textContent).toContain("选择左侧会话");
   });
 });

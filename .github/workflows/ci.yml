@@ -42,6 +42,7 @@ jobs:
           test -f dist/hupu-work-mode.user.js
           test -f dist/zhihu-work-mode.user.js
           test -f dist/weibo-work-mode.user.js
+          test -f dist/douban-work-mode.user.js
           test -z "$(git status --porcelain -- dist)"
 
       - name: Upload userscripts
