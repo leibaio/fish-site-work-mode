@@ -100,6 +100,7 @@ export const STYLES = `
 .fs-post-body { color: #222; font-size: 16px; line-height: 1.85; overflow-wrap: anywhere; }
 .fs-post-body p { margin: 0 0 1em; }
 .fs-post-body img { max-width: 100%; height: auto; border-radius: 4px; }
+.fs-post-body video { max-width: 100%; height: auto; border-radius: 4px; }
 .fs-post-body pre {
   margin: 1em 0; padding: 12px; overflow: auto; border-radius: 6px; background: #f6f8fa;
   font: 12px/1.6 Consolas, "SFMono-Regular", Menlo, monospace;

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         工作台 · V2EX
 // @namespace    fish-site-work-mode
-// @version      0.3.0
+// @version      0.4.0
 // @description  把 V2EX 变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT
@@ -220,6 +220,7 @@
 .fs-post-body { color: #222; font-size: 16px; line-height: 1.85; overflow-wrap: anywhere; }
 .fs-post-body p { margin: 0 0 1em; }
 .fs-post-body img { max-width: 100%; height: auto; border-radius: 4px; }
+.fs-post-body video { max-width: 100%; height: auto; border-radius: 4px; }
 .fs-post-body pre {
   margin: 1em 0; padding: 12px; overflow: auto; border-radius: 6px; background: #f6f8fa;
   font: 12px/1.6 Consolas, "SFMono-Regular", Menlo, monospace;

@@ -39,6 +39,7 @@ jobs:
           test -f dist/linuxdo-work-mode.user.js
           test -f dist/v2ex-work-mode.user.js
           test -f dist/chiphell-work-mode.user.js
+          test -f dist/hupu-work-mode.user.js
           test -z "$(git status --porcelain -- dist)"
 
       - name: Upload userscripts
