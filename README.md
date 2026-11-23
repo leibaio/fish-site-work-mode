@@ -3,7 +3,7 @@
 [![CI](https://github.com/leibaio/fish-site-work-mode/actions/workflows/ci.yml/badge.svg)](https://github.com/leibaio/fish-site-work-mode/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-多站点「摸鱼工作模式」：把论坛、社区网站包装成一个安静的工作台。
+多站点工作台：把论坛、社区网站包装成一个安静的工作台。
 
 页面被替换成三栏布局：
 
@@ -20,7 +20,7 @@
 - **中间**：阅读区（正文、帖子、文档）
 - **右侧**：持续滚动的运行日志
 
-目前已实现两个站点适配器：**linux.do** 和 **V2EX**。其余站点（小红书、Chiphell、知乎、虎扑、微博）共用 `packages/core`，按 `docs/MODE-BLUEPRINT.md` 里的适配器接口逐个补齐即可。
+目前已实现三个站点适配器：**linux.do**、**V2EX**、**Chiphell**。其余站点（小红书、知乎、虎扑、微博）共用 `packages/core`，按 `docs/MODE-BLUEPRINT.md` 里的适配器接口逐个补齐即可。
 
 ---
 
@@ -38,23 +38,24 @@
 
 - 点击左上角「微信」字样，切换成「工作目录」
 - 左栏变成 IDE 风格文件树：workspace、分支下拉、文件类型徽标、Git 修改标记
-- 顶栏文档名变成各站点自己的假文档（linux.do 为 `community-spec.pdf`，V2EX 为 `content-spec.pdf`），浏览器标签标题和 favicon 同步替换
+- 顶栏文档名变成各站点自己的假文档（linux.do 为 `community-spec.pdf`，V2EX 为 `content-spec.pdf`，Chiphell 为 `hardware-spec.pdf`），浏览器标签标题和 favicon 同步替换
 - 再点一次恢复原来的会话列表和页面标题
 
 伪装只是本地视觉层，不会修改任何服务端数据，也不会影响你在站点上的真实账号状态。
 
 ### 阅读
 
-- 打开 linux.do 话题 / V2EX 主题时，自动读取当前内容；从首页进入时展示最近话题
+- 打开 linux.do 话题 / V2EX 主题 / Chiphell 帖子时，自动读取当前内容；从首页或版块页进入时展示最近帖子
 - 帖子按楼层排序，保留站点正文 HTML（代码块、引用、图片、表格、链接）
 - 站内话题链接点击后，在本工作台内切换，不跳出页面
 - linux.do 长话题（超过首屏 20 楼）底部提供「加载更多回复」，分批拉取
 - V2EX 通过公开 API 一次性读取主题与全部回复
+- Chiphell 按 Discuz 分页加载后续楼层，每页约 30 帖
 - 站内链接默认新标签打开，不打断当前阅读
 
 ### 日志
 
-- linux.do / V2EX 版本默认使用本地模拟日志（通用的服务运行日志，不包含任何真实业务数据）
+- linux.do / V2EX / Chiphell 版本默认使用本地模拟日志（通用的服务运行日志，不包含任何真实业务数据）
 - 日志区域在「只看日志」模式下会占满屏幕，适合把窗口摆在工位上
 - 日志上限 400 行，自动滚动到底部
 
@@ -68,8 +69,9 @@
 2. 按需安装站点脚本：
    - linux.do：[dist/linuxdo-work-mode.user.js](https://github.com/leibaio/fish-site-work-mode/raw/main/dist/linuxdo-work-mode.user.js)
    - V2EX：[dist/v2ex-work-mode.user.js](https://github.com/leibaio/fish-site-work-mode/raw/main/dist/v2ex-work-mode.user.js)
+   - Chiphell：[dist/chiphell-work-mode.user.js](https://github.com/leibaio/fish-site-work-mode/raw/main/dist/chiphell-work-mode.user.js)
 3. Tampermonkey 弹出安装页后点「安装」
-4. 打开对应站点（<https://linux.do/> 或 <https://www.v2ex.com/>），脚本会自动接管
+4. 打开对应站点（<https://linux.do/>、<https://www.v2ex.com/> 或 <https://www.chiphell.com/>），脚本会自动接管
 
 脚本头里已经写入 `@updateURL` / `@downloadURL`，之后发新版本时 Tampermonkey 会自动检查更新。
 
@@ -82,18 +84,19 @@ npm install
 npm run build
 ```
 
-产物：`dist/linuxdo-work-mode.user.js`、`dist/v2ex-work-mode.user.js`。也可以打开 Tampermonkey 面板 →「添加新脚本」，把对应产物全文粘贴进去。
+产物：`dist/linuxdo-work-mode.user.js`、`dist/v2ex-work-mode.user.js`、`dist/chiphell-work-mode.user.js`。也可以打开 Tampermonkey 面板 →「添加新脚本」，把对应产物全文粘贴进去。
 
 ### 开发命令
 
 ```bash
-npm run typecheck   # TypeScript 类型检查
-npm test            # Vitest（jsdom）单元/集成测试
-npm run test:watch  # 监听模式
-npm run build       # 构建全部站点用户脚本
+npm run typecheck      # TypeScript 类型检查
+npm test               # Vitest（jsdom）单元/集成测试
+npm run test:watch     # 监听模式
+npm run build          # 构建全部站点用户脚本
 npm run build:linuxdo  # 只构建 linux.do
 npm run build:v2ex     # 只构建 V2EX
-npm run check       # typecheck + test + build
+npm run build:chiphell # 只构建 Chiphell
+npm run check          # typecheck + test + build
 ```
 
 ---
@@ -116,11 +119,15 @@ packages/
     v2ex/               # V2EX 适配器
       src/adapter.ts    # topics/latest、topics/show、replies/show
       src/index.ts      # 入口：startApp(v2exAdapter, v2exCoverStory)
+    chiphell/           # Chiphell（Discuz）适配器
+      src/adapter.ts    # 版块列表 HTML、帖子楼层 HTML、分页
+      src/index.ts      # 入口：startApp(chiphellAdapter, chiphellCoverStory)
   build/
     build.mjs           # esbuild 打包 + 用户脚本头
 tests/
   linuxdo-adapter.test.ts
   v2ex-adapter.test.ts
+  chiphell-adapter.test.ts
   core.test.ts
   utils.test.ts
 docs/
@@ -128,6 +135,7 @@ docs/
 dist/
   linuxdo-work-mode.user.js
   v2ex-work-mode.user.js
+  chiphell-work-mode.user.js
 ```
 
 ---
@@ -151,6 +159,16 @@ dist/
 | 最近话题 / 节点话题 | `GET /api/topics/latest.json`、`GET /api/topics/show.json?node_name=<node>` |
 | 主题详情 | `GET /api/topics/show.json?id=<topicId>` |
 | 全部回复 | `GET /api/replies/show.json?topic_id=<topicId>` |
+
+### Chiphell
+
+Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（只读 DOM）：
+
+| 用途 | 页面 |
+| --- | --- |
+| 版块帖子列表 | `GET /forum-<fid>-1.html`（默认 `fid=146`，电脑讨论） |
+| 帖子详情 | `GET /thread-<tid>-1-1.html` |
+| 后续楼层 | `GET /forum.php?mod=viewthread&tid=<tid>&page=<n>` |
 
 如果接口因未登录、权限、Cloudflare 验证、限频等原因失败，阅读区会显示错误提示，不会静默吞掉，也不会绕过站点权限。
 
@@ -178,8 +196,8 @@ dist/
 | --- | --- | --- |
 | linux.do | ✅ 可用 | Discourse，JSON 接口稳定 |
 | V2EX | ✅ 可用 | 公开 JSON API，主题 + 全部回复 |
+| Chiphell | ✅ 可用 | Discuz，版块/帖子 HTML + 分页 |
 | 小红书 | 计划 | 需要处理签名接口，优先 DOM 路线 |
-| Chiphell | 计划 | 传统论坛，DOM 解析为主 |
 | 知乎 | 计划 | 登录态严格，建议只读 DOM |
 | 虎扑 | 计划 | DOM / 移动端接口 |
 | 微博 | 计划 | 信息流结构变化频繁，需要容错 |
@@ -188,11 +206,13 @@ dist/
 
 ## 已知限制
 
-- linux.do / V2EX 都是**只读**的：可以浏览、翻页、切换话题，但不能发帖、回复、点赞、收藏
+- linux.do / V2EX / Chiphell 都是**只读**的：可以浏览、翻页、切换话题，但不能发帖、回复、点赞、收藏
 - linux.do 左栏只拉取「最新」第一页；V2EX 节点页通过 API 拉取该节点最新 10 条，暂未做翻页
 - V2EX 的回复由公开 API 一次性返回；超长主题如果被服务端截断，工作台不会自动补页
+- Chiphell 在首页使用默认版块「电脑讨论(新)」（fid=146）；帖子页会跟随当前帖子所在版块
+- Chiphell 部分版块/附件需要登录才能查看，权限不足时会显示加载失败
 - 伪装只覆盖前端，不改变浏览器历史记录里的真实 URL
-- 站点改版或接口限频后，对应适配器可能需要同步调整
+- 站点改版、接口限频或反爬策略变化后，对应适配器可能需要同步调整
 
 ---
 
@@ -213,12 +233,12 @@ dist/
 # 1. 修改 package.json 的 version，并更新 CHANGELOG.md
 npm run check
 git add dist package.json CHANGELOG.md
-git commit -m "chore: release v0.2.1"
-git tag v0.2.1
+git commit -m "chore: release v0.3.1"
+git tag v0.3.1
 git push origin main --tags
 ```
 
-CI 会校验提交的 `dist` 与源码构建结果一致。也可以在 GitHub Releases 里附上两个 `.user.js` 作为附件。
+CI 会校验提交的 `dist` 与源码构建结果一致。也可以在 GitHub Releases 里附上三个 `.user.js` 作为附件。
 
 ---
 
@@ -227,6 +247,7 @@ CI 会校验提交的 `dist` 与源码构建结果一致。也可以在 GitHub R
 - [xhs-wechat-mode](https://github.com/jjb4150/xhs-wechat-mode)：微信聊天式页面的交互参考，MIT
 - [linux.do](https://linux.do/)：Discourse 社区，第一个适配对象
 - [V2EX](https://www.v2ex.com/)：公开 JSON API 的社区，第二个适配对象
+- [Chiphell](https://www.chiphell.com/)：Discuz 论坛，第三个适配对象
 - 多站点架构与路线设计见 [docs/MODE-BLUEPRINT.md](docs/MODE-BLUEPRINT.md)
 
 ## License

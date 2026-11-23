@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         摸鱼工作模式 · V2EX
+// @name         工作台 · V2EX
 // @namespace    fish-site-work-mode
-// @version      0.2.0
+// @version      0.3.0
 // @description  把 V2EX 变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT
@@ -433,11 +433,11 @@
       date.getMilliseconds()
     ).padStart(3, "0")}`;
   }
-  function avatarMarkup(avatar, title, className) {
+  function avatarMarkup(avatar, title, className, fallback) {
     if (avatar) {
       return `<img class="${className}" src="${escapeAttr(avatar)}" alt="" loading="lazy">`;
     }
-    return `<span class="${className} fs-avatar-letter">${escapeHtml(firstChar(title))}</span>`;
+    return `<span class="${className} fs-avatar-letter">${escapeHtml(firstChar(fallback || title))}</span>`;
   }
   function fileBadge(name) {
     const extension = String(name).split(".").pop()?.toLowerCase() ?? "";
@@ -740,7 +740,7 @@
         return `<div class="fs-item${active}" data-id="${escapeAttr(conversation.id)}" title="${escapeAttr(
           conversation.title
         )}">
-          ${avatarMarkup(conversation.avatar, conversation.title, "fs-avatar")}
+          ${avatarMarkup(conversation.avatar, conversation.title, "fs-avatar", conversation.avatarFallback)}
           <div class="fs-item-main">
             <div class="fs-item-title">${escapeHtml(conversation.title)}</div>
             <div class="fs-item-sub">${escapeHtml(subtitle)}</div>
@@ -762,7 +762,7 @@
         headCover.innerHTML = `<span class="fs-doc-icon">DOC</span>`;
       } else {
         const avatar = conversation?.avatar;
-        headCover.innerHTML = avatar ? `<img src="${escapeAttr(avatar)}" alt="" loading="lazy">` : escapeHtml(firstChar(title));
+        headCover.innerHTML = avatar ? `<img src="${escapeAttr(avatar)}" alt="" loading="lazy">` : escapeHtml(firstChar(conversation?.avatarFallback || title));
       }
       headTitle.textContent = title;
       headSub.textContent = subtitle;

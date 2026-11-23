@@ -74,11 +74,16 @@ function logClock(timestamp?: number): string {
   ).padStart(3, "0")}`;
 }
 
-function avatarMarkup(avatar: string | undefined, title: string, className: string): string {
+function avatarMarkup(
+  avatar: string | undefined,
+  title: string,
+  className: string,
+  fallback?: string,
+): string {
   if (avatar) {
     return `<img class="${className}" src="${escapeAttr(avatar)}" alt="" loading="lazy">`;
   }
-  return `<span class="${className} fs-avatar-letter">${escapeHtml(firstChar(title))}</span>`;
+  return `<span class="${className} fs-avatar-letter">${escapeHtml(firstChar(fallback || title))}</span>`;
 }
 
 function fileBadge(name: string): { label: string; cls: string } {
@@ -437,7 +442,7 @@ export async function startApp(
         return `<div class="fs-item${active}" data-id="${escapeAttr(conversation.id)}" title="${escapeAttr(
           conversation.title,
         )}">
-          ${avatarMarkup(conversation.avatar, conversation.title, "fs-avatar")}
+          ${avatarMarkup(conversation.avatar, conversation.title, "fs-avatar", conversation.avatarFallback)}
           <div class="fs-item-main">
             <div class="fs-item-title">${escapeHtml(conversation.title)}</div>
             <div class="fs-item-sub">${escapeHtml(subtitle)}</div>
@@ -472,7 +477,7 @@ export async function startApp(
       const avatar = conversation?.avatar;
       headCover.innerHTML = avatar
         ? `<img src="${escapeAttr(avatar)}" alt="" loading="lazy">`
-        : escapeHtml(firstChar(title));
+        : escapeHtml(firstChar(conversation?.avatarFallback || title));
     }
     headTitle.textContent = title;
     headSub.textContent = subtitle;

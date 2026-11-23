@@ -9,14 +9,19 @@ const site = process.argv[2] || "linuxdo";
 
 const sites = {
   linuxdo: {
-    name: "摸鱼工作模式 · linux.do",
+    name: "工作台 · linux.do",
     matches: ["https://linux.do/*", "https://www.linux.do/*"],
     description: "把 linux.do 变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。",
   },
   v2ex: {
-    name: "摸鱼工作模式 · V2EX",
+    name: "工作台 · V2EX",
     matches: ["https://v2ex.com/*", "https://www.v2ex.com/*"],
     description: "把 V2EX 变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。",
+  },
+  chiphell: {
+    name: "工作台 · Chiphell",
+    matches: ["https://chiphell.com/*", "https://www.chiphell.com/*"],
+    description: "把 Chiphell 变成工作台：左栏帖子、中间阅读区、右侧运行日志，支持工作目录伪装。",
   },
 };
 

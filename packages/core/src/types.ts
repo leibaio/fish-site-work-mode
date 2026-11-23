@@ -3,6 +3,8 @@ export interface Conversation {
   title: string;
   subtitle?: string;
   avatar?: string;
+  /** 无头像时使用的文字，例如作者名或会话名 */
+  avatarFallback?: string;
   updatedAt?: number;
   unread?: boolean;
 }

@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.3.0 — 2026-11-23
+
+新增 Chiphell 适配器。
+
+### 新增
+
+- Chiphell（Discuz X3.5）站点适配器：
+  - `GET /forum-<fid>-1.html` 读取版块帖子列表，首页默认 fid=146（电脑讨论）
+  - `GET /thread-<tid>-1-1.html` 读取帖子与首屏楼层
+  - `GET /forum.php?mod=viewthread&tid=<tid>&page=<n>` 加载后续楼层
+  - 自动解析楼层号、作者、头像、发帖时间、查看/回复数
+  - 自动把 Discuz 的 `file` / `zoomfile` 懒加载图片还原为真实 `src`
+  - 帖子页会跟随当前帖子所在版块刷新左栏
+- `Conversation.avatarFallback`：没有头像的站点可以用作者名生成文字头像
+- 新增 Chiphell 工作伪装覆盖：`hardware-service` workspace、Go 文件树、`hardware-spec.pdf`
+- 构建脚本支持第三个站点，`npm run build` 一次构建 linux.do、V2EX、Chiphell
+- CI 校验全部 `dist` 产物并上传三个用户脚本
+- 新增 Chiphell 适配器测试，测试总数 19
+
+### 变更
+
+- 用户脚本名称统一为「工作台 · 站点」
+- 项目描述和 README 同步更新
+
 ## 0.2.0 — 2026-11-23
 
 新增 V2EX 适配器。
