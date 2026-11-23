@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.0 — 2026-11-23
+
+新增 V2EX 适配器。
+
+### 新增
+
+- V2EX 站点适配器：
+  - `GET /api/topics/latest.json` 拉取最近话题
+  - `GET /api/topics/show.json?node_name=<node>` 读取节点话题
+  - `GET /api/topics/show.json?id=<id>` 读取主题
+  - `GET /api/replies/show.json?topic_id=<id>` 读取全部回复
+  - 从 `/t/<id>` 进入时优先打开当前主题
+  - 主题正文 + 全部回复，显示楼主 / 楼层 / 感谢数
+  - 支持 `/go/<node>` 节点页作为左栏话题来源
+- 新增 V2EX 工作伪装覆盖：`content-service` workspace、TypeScript 文件树、`content-spec.pdf`
+- 构建脚本支持多站点，`npm run build` 一次构建 linux.do 与 V2EX
+- CI 校验全部 `dist` 产物并上传两个用户脚本
+- 新增 V2EX 适配器测试，测试总数 15
+
 ## 0.1.0 — 2026-11-20
 
 首个可用版本：linux.do 适配器 + 多站点工作台内核。

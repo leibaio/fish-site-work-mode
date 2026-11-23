@@ -34,14 +34,15 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Verify committed userscript is up to date
+      - name: Verify committed userscripts are up to date
         run: |
           test -f dist/linuxdo-work-mode.user.js
-          test -z "$(git status --porcelain -- dist/linuxdo-work-mode.user.js)"
+          test -f dist/v2ex-work-mode.user.js
+          test -z "$(git status --porcelain -- dist)"
 
-      - name: Upload userscript
+      - name: Upload userscripts
         uses: actions/upload-artifact@v4
         with:
-          name: linuxdo-work-mode-userscript
-          path: dist/linuxdo-work-mode.user.js
+          name: work-mode-userscripts
+          path: dist/*.user.js
           if-no-files-found: error

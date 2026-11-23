@@ -1,6 +1,6 @@
 {
   "name": "fish-site-work-mode",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "多站点「摸鱼工作模式」：左栏会话/工作目录、中间阅读区、右侧运行日志",
@@ -25,8 +25,9 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "node packages/build/build.mjs linuxdo",
+    "build": "node packages/build/build.mjs linuxdo && node packages/build/build.mjs v2ex",
     "build:linuxdo": "node packages/build/build.mjs linuxdo",
+    "build:v2ex": "node packages/build/build.mjs v2ex",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

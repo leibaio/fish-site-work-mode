@@ -13,6 +13,11 @@ const sites = {
     matches: ["https://linux.do/*", "https://www.linux.do/*"],
     description: "把 linux.do 变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。",
   },
+  v2ex: {
+    name: "摸鱼工作模式 · V2EX",
+    matches: ["https://v2ex.com/*", "https://www.v2ex.com/*"],
+    description: "把 V2EX 变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。",
+  },
 };
 
 const meta = sites[site];

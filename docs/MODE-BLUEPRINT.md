@@ -359,6 +359,7 @@ main ▾ · 3 changes
 | 站点 | 页面/左栏 | 阅读区 | 推荐数据路线 | 难度 | 关键风险 |
 | --- | --- | --- | --- | --- | --- |
 | **linux.do** | Discourse 主题列表 | 帖子楼层 | `/latest.json`、`/t/<id>.json` 或 DOM | 低 | SPA、登录/CORS |
+| **V2EX** | 最新/节点话题 | 主题 + 全部回复 | `/api/topics/latest.json`、`/api/topics/show.json`、`/api/replies/show.json` | 低 | 公开 API 限频 |
 | **小红书** | 发现 feed / 笔记 | 正文 + 图片 + 评论 | feed DOM + 笔记页 SSR + 隐藏 iframe（参考 xhs-wechat-mode） | 高 | 签名、风控、隐藏页驱动 |
 | **Chiphell** | 版块帖子列表 | 帖子楼层 | HTML DOM + 分页；必要时离屏驱动 | 中高 | 登录、反爬、图片防盗链 |
 | **知乎** | 推荐/问题/回答 | 长文回答 | 页面 DOM + 页面自己的 API 响应 | 高 | `x-zse-96` 签名、风控、长文分页 |
@@ -484,9 +485,10 @@ wm:global:loglevel
 1. 先抽 **Shell + 日志 + 工作目录**（无站点依赖）。
 2. 把 weread 现有 UI 改成 core 的 `document`/`pdf` 渲染器。
 3. 用 **linux.do** 做第一个新适配器（Discourse JSON 最简单）。
-4. 再做 **Chiphell / 虎扑**（论坛 HTML）。
-5. 知乎/微博：先做 DOM/页面自有请求，不碰签名。
-6. 小红书：直接参考 `xhs-wechat-mode` 的 feed DOM + 隐藏 iframe。
+4. 用 **V2EX** 验证公开 JSON API + 主题/回复模型。
+5. 再做 **Chiphell / 虎扑**（论坛 HTML）。
+6. 知乎/微博：先做 DOM/页面自有请求，不碰签名。
+7. 小红书：直接参考 `xhs-wechat-mode` 的 feed DOM + 隐藏 iframe。
 
 ---
 
