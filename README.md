@@ -30,6 +30,7 @@
 
 - 三栏：最近话题 / 阅读区 / 运行日志
 - 左栏和日志栏宽度都可以鼠标拖动调节，宽度会记在本地
+- linux.do 左栏默认加载最新前两页（约 60 条），底部「加载更多话题」继续翻页
 - 点击顶栏标题、`日志` 按钮，或按 `Ctrl+Alt+Q`，在「阅读区」和「只看日志」之间切换
 - 窗口宽度小于 1000px 时不接管页面
 - 右上角 `⏏` 退出后，右下角保留一个悬浮球，点击恢复
@@ -179,7 +180,8 @@ dist/
 
 | 用途 | 接口 |
 | --- | --- |
-| 最近话题 | `GET /latest.json?page=1` |
+| 最近话题 | `GET /latest.json`（第 1 页）、`GET /latest.json?page=1`（第 2 页） |
+| 左栏加载更多 | `GET /latest.json?page=<n>`，按 `more_topics_url` 判断是否还有下一页 |
 | 话题详情 | `GET /t/<topicId>.json` |
 | 加载更多楼层 | `GET /t/<topicId>/posts.json?post_ids[]=...` |
 
@@ -254,7 +256,7 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 
 | 站点 | 状态 | 备注 |
 | --- | --- | --- |
-| linux.do | ✅ 可用 | Discourse，JSON 接口稳定 |
+| linux.do | ✅ 可用 | Discourse，JSON 接口稳定；左栏支持分页加载 |
 | V2EX | ✅ 可用 | 公开 JSON API，主题 + 全部回复 |
 | Chiphell | ✅ 可用 | Discuz，版块/帖子 HTML + 分页 |
 | 虎扑 | ✅ 可用 | BBS HTML，步行街列表 + 帖子分页 |
@@ -268,7 +270,7 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 ## 已知限制
 
 - linux.do / V2EX / Chiphell / 虎扑都是**只读**的：可以浏览、翻页、切换话题，但不能发帖、回复、点赞、收藏
-- linux.do 左栏只拉取「最新」第一页；V2EX 节点页通过 API 拉取该节点最新 10 条，暂未做翻页
+- linux.do 左栏默认加载最新前两页，底部可以继续「加载更多话题」；V2EX 节点页通过 API 拉取该节点最新 10 条，暂未做翻页
 - V2EX 的回复由公开 API 一次性返回；超长主题如果被服务端截断，工作台不会自动补页
 - Chiphell 在首页使用默认版块「电脑讨论(新)」（fid=146）；帖子页会跟随当前帖子所在版块
 - 虎扑默认支持步行街主干道（`/bxj`、`/topic-daily`）；帖子页会尝试跟随面包屑里的父版块
@@ -299,8 +301,8 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 # 1. 修改 package.json 的 version，并更新 CHANGELOG.md
 npm run check
 git add dist package.json CHANGELOG.md
-git commit -m "chore: release v0.6.1"
-git tag v0.6.1
+git commit -m "chore: release v0.7.1"
+git tag v0.7.1
 git push origin main --tags
 ```
 

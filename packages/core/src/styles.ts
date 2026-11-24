@@ -38,6 +38,13 @@ export const STYLES = `
 .fs-item-sub { margin-top: 3px; font-size: 12px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fs-item-time { align-self: flex-start; margin-top: 2px; font-size: 11px; color: #b3b3b3; }
 .fs-item-unread { width: 7px; height: 7px; border-radius: 50%; background: #fa5151; flex: 0 0 7px; }
+.fs-list-more {
+  display: block; width: calc(100% - 24px); margin: 8px 12px 12px; padding: 7px 0;
+  border: 1px solid #e2e2e2; border-radius: 6px; background: #fff; color: #666;
+  font-size: 12px; cursor: pointer;
+}
+.fs-list-more:hover { background: #f0f0f0; }
+.fs-list-more[disabled] { opacity: .6; cursor: default; }
 .fs-side-foot {
   height: 34px; flex: 0 0 34px; display: flex; align-items: center; justify-content: center;
   font-size: 11px; color: #aaa; border-top: 1px solid #ececec;

@@ -17,6 +17,12 @@ export interface ContentView {
   cursor?: unknown;
 }
 
+export interface ConversationPage {
+  conversations: Conversation[];
+  hasMore: boolean;
+  cursor?: unknown;
+}
+
 export interface LoadMoreResult {
   html: string;
   hasMore: boolean;
@@ -74,7 +80,8 @@ export interface SiteAdapter {
   normalTitle: string;
   match(url: URL): boolean;
   detect(): Promise<SiteContext | null>;
-  listConversations(): Promise<Conversation[]>;
+  listConversations(): Promise<Conversation[] | ConversationPage>;
+  loadMoreConversations?(cursor: unknown): Promise<ConversationPage>;
   openConversation(id: string): Promise<ContentView>;
   loadMore?(id: string, cursor: unknown): Promise<LoadMoreResult>;
   initialConversationId?(ctx: SiteContext): string | null;

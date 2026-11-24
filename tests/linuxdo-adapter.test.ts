@@ -7,6 +7,13 @@ import {
   parseTopic,
 } from "../packages/adapters/linuxdo/src/adapter";
 
+function jsonResponse(payload: unknown): Response {
+  return new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+}
+
 describe("linux.do adapter", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -123,5 +130,66 @@ describe("linux.do adapter", () => {
     expect(result.html).toContain("Third");
     expect(result.hasMore).toBe(true);
     expect(result.cursor).toEqual([23]);
+  });
+
+  it("loads two latest pages initially and exposes a cursor", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/latest.json") {
+        return jsonResponse({
+          users: [{ id: 7, username: "alice", avatar_template: "/a/{size}.png" }],
+          topic_list: {
+            topics: [
+              { id: 1, title: "First", posts_count: 2, bumped_at: "2026-11-23T00:00:00.000Z" },
+            ],
+            more_topics_url: "/latest?page=1",
+          },
+        });
+      }
+      if (url.includes("page=1")) {
+        return jsonResponse({
+          users: [{ id: 8, username: "bob", avatar_template: "/b/{size}.png" }],
+          topic_list: {
+            topics: [
+              { id: 2, title: "Second", posts_count: 1, bumped_at: "2026-11-22T00:00:00.000Z" },
+            ],
+            more_topics_url: "/latest?page=2",
+          },
+        });
+      }
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const page = await linuxdoAdapter.listConversations();
+
+    expect(Array.isArray(page)).toBe(false);
+    if (Array.isArray(page)) throw new Error("expected a conversation page");
+    expect(page.conversations.map((conversation) => conversation.id)).toEqual(["1", "2"]);
+    expect(page.hasMore).toBe(true);
+    expect(page.cursor).toEqual({ page: 2 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("loads additional latest pages for the sidebar", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), "https://linux.do");
+      expect(url.pathname).toBe("/latest.json");
+      expect(url.searchParams.get("page")).toBe("2");
+      return jsonResponse({
+        topic_list: {
+          topics: [
+            { id: 3, title: "Third", posts_count: 1, bumped_at: "2026-11-21T00:00:00.000Z" },
+          ],
+        },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const page = await linuxdoAdapter.loadMoreConversations?.({ page: 2 });
+
+    expect(page?.conversations.map((conversation) => conversation.id)).toEqual(["3"]);
+    expect(page?.hasMore).toBe(false);
+    expect(page?.cursor).toEqual({ page: 3 });
   });
 });

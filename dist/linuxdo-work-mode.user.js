@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         工作台 · linux.do
 // @namespace    fish-site-work-mode
-// @version      0.6.0
+// @version      0.7.0
 // @description  把 linux.do 变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT
@@ -158,6 +158,13 @@
 .fs-item-sub { margin-top: 3px; font-size: 12px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fs-item-time { align-self: flex-start; margin-top: 2px; font-size: 11px; color: #b3b3b3; }
 .fs-item-unread { width: 7px; height: 7px; border-radius: 50%; background: #fa5151; flex: 0 0 7px; }
+.fs-list-more {
+  display: block; width: calc(100% - 24px); margin: 8px 12px 12px; padding: 7px 0;
+  border: 1px solid #e2e2e2; border-radius: 6px; background: #fff; color: #666;
+  font-size: 12px; cursor: pointer;
+}
+.fs-list-more:hover { background: #f0f0f0; }
+.fs-list-more[disabled] { opacity: .6; cursor: default; }
 .fs-side-foot {
   height: 34px; flex: 0 0 34px; display: flex; align-items: center; justify-content: center;
   font-size: 11px; color: #aaa; border-top: 1px solid #ececec;
@@ -452,6 +459,9 @@
     }
     return `<span class="${className} fs-avatar-letter">${escapeHtml(firstChar(fallback || title))}</span>`;
   }
+  function normalizeConversationPage(result) {
+    return Array.isArray(result) ? { conversations: result, hasMore: false } : result;
+  }
   function fileBadge(name) {
     const extension = String(name).split(".").pop()?.toLowerCase() ?? "";
     const map = {
@@ -506,6 +516,9 @@
       currentView: null,
       listError: "",
       dataLoaded: false,
+      listCursor: void 0,
+      listHasMore: false,
+      listLoading: false,
       openToken: 0
     };
     const workIndex = /* @__PURE__ */ new Map();
@@ -748,7 +761,7 @@
         list.innerHTML = `<div class="fs-empty"${state.listError ? ` title="${escapeAttr(state.listError)}"` : ""}>${label}</div>`;
         return;
       }
-      list.innerHTML = state.conversations.map((conversation) => {
+      const items = state.conversations.map((conversation) => {
         const active = conversation.id === state.currentId ? " active" : "";
         const subtitle = conversation.subtitle || "";
         return `<div class="fs-item${active}" data-id="${escapeAttr(conversation.id)}" title="${escapeAttr(
@@ -762,6 +775,8 @@
           ${conversation.unread ? `<span class="fs-item-unread"></span>` : `<span class="fs-item-time">${escapeHtml(timeAgo(conversation.updatedAt))}</span>`}
         </div>`;
       }).join("");
+      const more = state.listHasMore && adapter.loadMoreConversations ? `<button class="fs-list-more" type="button"${state.listLoading ? " disabled" : ""}>${state.listLoading ? "加载中…" : "加载更多话题"}</button>` : "";
+      list.innerHTML = items + more;
     }
     function renderSidebar() {
       setBrandAndFoot();
@@ -854,14 +869,20 @@
       if (state.dataLoaded) return;
       state.dataLoaded = true;
       try {
-        state.conversations = await adapter.listConversations();
+        const page = normalizeConversationPage(await adapter.listConversations());
+        state.conversations = page.conversations;
+        state.listCursor = page.cursor;
+        state.listHasMore = page.hasMore;
         state.listError = "";
       } catch (error) {
         state.dataLoaded = false;
         state.listError = error instanceof Error ? error.message : String(error);
         state.conversations = [];
+        state.listCursor = void 0;
+        state.listHasMore = false;
         toast(`话题列表加载失败：${state.listError}`);
       }
+      state.listLoading = false;
       renderSidebar();
       const autoOpen = adapter.autoOpenFirst !== false;
       const preferred = adapter.initialConversationId?.(ctx) || (autoOpen ? store.get("lastId", "") : "");
@@ -876,7 +897,11 @@
     }
     async function refreshConversations() {
       try {
-        state.conversations = await adapter.listConversations();
+        const page = normalizeConversationPage(await adapter.listConversations());
+        state.conversations = page.conversations;
+        state.listCursor = page.cursor;
+        state.listHasMore = page.hasMore;
+        state.listLoading = false;
         state.listError = "";
         renderSidebar();
         if (!state.currentId && state.conversations[0]) {
@@ -885,6 +910,32 @@
         toast("已刷新");
       } catch (error) {
         toast(`刷新失败：${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    async function loadMoreConversations() {
+      if (!adapter.loadMoreConversations || !state.listHasMore || state.listLoading) return;
+      state.listLoading = true;
+      const button = list.querySelector(".fs-list-more");
+      if (button) {
+        button.disabled = true;
+        button.textContent = "加载中…";
+      }
+      try {
+        const page = await adapter.loadMoreConversations(state.listCursor);
+        const existing = new Set(state.conversations.map((conversation) => conversation.id));
+        const added = page.conversations.filter((conversation) => !existing.has(conversation.id));
+        const scrollTop = list.scrollTop;
+        state.conversations.push(...added);
+        state.listCursor = page.cursor;
+        state.listHasMore = page.hasMore;
+        state.listLoading = false;
+        renderSidebar();
+        list.scrollTop = scrollTop;
+        if (added.length) toast(`已加载 ${added.length} 条话题`);
+      } catch (error) {
+        state.listLoading = false;
+        renderSidebar();
+        toast(`加载更多失败：${error instanceof Error ? error.message : String(error)}`);
       }
     }
     function applyLogsOnly() {
@@ -1033,6 +1084,10 @@
             renderSidebar();
           }
         }
+        return;
+      }
+      if (target.closest(".fs-list-more")) {
+        void loadMoreConversations();
         return;
       }
       const item = target.closest(".fs-item");
@@ -1244,6 +1299,22 @@
       pathname
     );
   }
+  function mergeLatestPages(pages) {
+    const users = /* @__PURE__ */ new Map();
+    const topics = /* @__PURE__ */ new Map();
+    for (const page of pages) {
+      for (const user of page.users ?? []) users.set(user.id, user);
+      for (const topic of page.topic_list?.topics ?? []) topics.set(topic.id, topic);
+    }
+    return {
+      users: [...users.values()],
+      topic_list: { topics: [...topics.values()] }
+    };
+  }
+  async function fetchLatestPage(page) {
+    const path = page <= 0 ? "/latest.json" : `/latest.json?page=${page}`;
+    return fetchJson(path);
+  }
   var linuxdoAdapter = {
     id: "linuxdo",
     label: "linux.do",
@@ -1265,8 +1336,30 @@
     },
     conversationIdFromUrl,
     async listConversations() {
-      const data = await fetchJson("/latest.json?page=1");
-      return latestToConversations(data);
+      const first = await fetchLatestPage(0);
+      let second = null;
+      try {
+        second = await fetchLatestPage(1);
+      } catch {
+        second = null;
+      }
+      const merged = mergeLatestPages(second ? [first, second] : [first]);
+      const lastPage = second || first;
+      return {
+        conversations: latestToConversations(merged),
+        hasMore: Boolean(lastPage.topic_list?.more_topics_url),
+        cursor: { page: second ? 2 : 1 }
+      };
+    },
+    async loadMoreConversations(cursor) {
+      const rawPage = cursor && typeof cursor === "object" && "page" in cursor ? Number(cursor.page) : 1;
+      const page = Number.isFinite(rawPage) && rawPage >= 1 ? rawPage : 1;
+      const data = await fetchLatestPage(page);
+      return {
+        conversations: latestToConversations(data),
+        hasMore: Boolean(data.topic_list?.more_topics_url),
+        cursor: { page: page + 1 }
+      };
     },
     async openConversation(id) {
       const data = await fetchJson(`/t/${encodeURIComponent(id)}.json`);

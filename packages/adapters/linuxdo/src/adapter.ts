@@ -1,6 +1,7 @@
 import type {
   ContentView,
   Conversation,
+  ConversationPage,
   CoverStory,
   LoadMoreResult,
   SiteAdapter,
@@ -36,7 +37,7 @@ interface DiscourseTopic {
 
 interface DiscourseLatest {
   users?: DiscourseUser[];
-  topic_list?: { topics?: DiscourseTopic[] };
+  topic_list?: { topics?: DiscourseTopic[]; more_topics_url?: string };
 }
 
 interface DiscoursePost {
@@ -201,6 +202,24 @@ function isSupportedPath(pathname: string): boolean {
   );
 }
 
+function mergeLatestPages(pages: DiscourseLatest[]): DiscourseLatest {
+  const users = new Map<number, DiscourseUser>();
+  const topics = new Map<number, DiscourseTopic>();
+  for (const page of pages) {
+    for (const user of page.users ?? []) users.set(user.id, user);
+    for (const topic of page.topic_list?.topics ?? []) topics.set(topic.id, topic);
+  }
+  return {
+    users: [...users.values()],
+    topic_list: { topics: [...topics.values()] },
+  };
+}
+
+async function fetchLatestPage(page: number): Promise<DiscourseLatest> {
+  const path = page <= 0 ? "/latest.json" : `/latest.json?page=${page}`;
+  return fetchJson<DiscourseLatest>(path);
+}
+
 export const linuxdoAdapter: SiteAdapter = {
   id: "linuxdo",
   label: "linux.do",
@@ -226,9 +245,36 @@ export const linuxdoAdapter: SiteAdapter = {
 
   conversationIdFromUrl,
 
-  async listConversations(): Promise<Conversation[]> {
-    const data = await fetchJson<DiscourseLatest>("/latest.json?page=1");
-    return latestToConversations(data);
+  async listConversations(): Promise<ConversationPage> {
+    const first = await fetchLatestPage(0);
+    let second: DiscourseLatest | null = null;
+    try {
+      second = await fetchLatestPage(1);
+    } catch {
+      second = null;
+    }
+
+    const merged = mergeLatestPages(second ? [first, second] : [first]);
+    const lastPage = second || first;
+    return {
+      conversations: latestToConversations(merged),
+      hasMore: Boolean(lastPage.topic_list?.more_topics_url),
+      cursor: { page: second ? 2 : 1 },
+    };
+  },
+
+  async loadMoreConversations(cursor: unknown): Promise<ConversationPage> {
+    const rawPage =
+      cursor && typeof cursor === "object" && "page" in cursor
+        ? Number((cursor as { page: number }).page)
+        : 1;
+    const page = Number.isFinite(rawPage) && rawPage >= 1 ? rawPage : 1;
+    const data = await fetchLatestPage(page);
+    return {
+      conversations: latestToConversations(data),
+      hasMore: Boolean(data.topic_list?.more_topics_url),
+      cursor: { page: page + 1 },
+    };
   },
 
   async openConversation(id: string): Promise<ContentView> {

@@ -5,6 +5,7 @@ import type {
   AppOptions,
   ContentView,
   Conversation,
+  ConversationPage,
   CoverStory,
   LogEntry,
   LogProvider,
@@ -52,6 +53,9 @@ export interface AppState {
   currentView: ContentView | null;
   listError: string;
   dataLoaded: boolean;
+  listCursor: unknown;
+  listHasMore: boolean;
+  listLoading: boolean;
   openToken: number;
 }
 
@@ -84,6 +88,12 @@ function avatarMarkup(
     return `<img class="${className}" src="${escapeAttr(avatar)}" alt="" loading="lazy">`;
   }
   return `<span class="${className} fs-avatar-letter">${escapeHtml(firstChar(fallback || title))}</span>`;
+}
+
+function normalizeConversationPage(
+  result: Conversation[] | ConversationPage,
+): ConversationPage {
+  return Array.isArray(result) ? { conversations: result, hasMore: false } : result;
 }
 
 function fileBadge(name: string): { label: string; cls: string } {
@@ -150,6 +160,9 @@ export async function startApp(
     currentView: null,
     listError: "",
     dataLoaded: false,
+    listCursor: undefined,
+    listHasMore: false,
+    listLoading: false,
     openToken: 0,
   };
 
@@ -436,7 +449,8 @@ export async function startApp(
       }>${label}</div>`;
       return;
     }
-    list.innerHTML = state.conversations
+
+    const items = state.conversations
       .map((conversation) => {
         const active = conversation.id === state.currentId ? " active" : "";
         const subtitle = conversation.subtitle || "";
@@ -456,6 +470,14 @@ export async function startApp(
         </div>`;
       })
       .join("");
+
+    const more =
+      state.listHasMore && adapter.loadMoreConversations
+        ? `<button class="fs-list-more" type="button"${
+            state.listLoading ? " disabled" : ""
+          }>${state.listLoading ? "加载中…" : "加载更多话题"}</button>`
+        : "";
+    list.innerHTML = items + more;
   }
 
   function renderSidebar(): void {
@@ -563,14 +585,20 @@ export async function startApp(
     if (state.dataLoaded) return;
     state.dataLoaded = true;
     try {
-      state.conversations = await adapter.listConversations();
+      const page = normalizeConversationPage(await adapter.listConversations());
+      state.conversations = page.conversations;
+      state.listCursor = page.cursor;
+      state.listHasMore = page.hasMore;
       state.listError = "";
     } catch (error) {
       state.dataLoaded = false;
       state.listError = error instanceof Error ? error.message : String(error);
       state.conversations = [];
+      state.listCursor = undefined;
+      state.listHasMore = false;
       toast(`话题列表加载失败：${state.listError}`);
     }
+    state.listLoading = false;
     renderSidebar();
 
     const autoOpen = adapter.autoOpenFirst !== false;
@@ -589,7 +617,11 @@ export async function startApp(
 
   async function refreshConversations(): Promise<void> {
     try {
-      state.conversations = await adapter.listConversations();
+      const page = normalizeConversationPage(await adapter.listConversations());
+      state.conversations = page.conversations;
+      state.listCursor = page.cursor;
+      state.listHasMore = page.hasMore;
+      state.listLoading = false;
       state.listError = "";
       renderSidebar();
       if (!state.currentId && state.conversations[0]) {
@@ -598,6 +630,33 @@ export async function startApp(
       toast("已刷新");
     } catch (error) {
       toast(`刷新失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async function loadMoreConversations(): Promise<void> {
+    if (!adapter.loadMoreConversations || !state.listHasMore || state.listLoading) return;
+    state.listLoading = true;
+    const button = list.querySelector<HTMLButtonElement>(".fs-list-more");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "加载中…";
+    }
+    try {
+      const page = await adapter.loadMoreConversations(state.listCursor);
+      const existing = new Set(state.conversations.map((conversation) => conversation.id));
+      const added = page.conversations.filter((conversation) => !existing.has(conversation.id));
+      const scrollTop = list.scrollTop;
+      state.conversations.push(...added);
+      state.listCursor = page.cursor;
+      state.listHasMore = page.hasMore;
+      state.listLoading = false;
+      renderSidebar();
+      list.scrollTop = scrollTop;
+      if (added.length) toast(`已加载 ${added.length} 条话题`);
+    } catch (error) {
+      state.listLoading = false;
+      renderSidebar();
+      toast(`加载更多失败：${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -764,6 +823,10 @@ export async function startApp(
           renderSidebar();
         }
       }
+      return;
+    }
+    if (target.closest(".fs-list-more")) {
+      void loadMoreConversations();
       return;
     }
     const item = target.closest(".fs-item");

@@ -147,4 +147,36 @@ describe("core shell", () => {
     expect(opened).not.toHaveBeenCalled();
     expect(shadow.querySelector(".fs-content")?.textContent).toContain("选择左侧会话");
   });
+
+  it("loads more conversations from the sidebar", async () => {
+    const adapter = mockAdapter();
+    adapter.listConversations = async () => ({
+      conversations: [
+        { id: "1", title: "Topic One", subtitle: "1 回复", updatedAt: Date.now() },
+      ],
+      hasMore: true,
+      cursor: { page: 2 },
+    });
+    const loadMore = vi.fn(async () => ({
+      conversations: [
+        { id: "2", title: "Topic Two", subtitle: "2 回复", updatedAt: Date.now() },
+      ],
+      hasMore: false,
+      cursor: undefined,
+    }));
+    adapter.loadMoreConversations = loadMore;
+
+    handle = await startApp(adapter, coverStory);
+    const shadow = handle!.shadow;
+    await waitFor(() => !!shadow.querySelector(".fs-list-more"));
+    (shadow.querySelector(".fs-list-more") as HTMLButtonElement).click();
+
+    await waitFor(() => shadow.querySelectorAll(".fs-item").length === 2);
+    expect(loadMore).toHaveBeenCalledTimes(1);
+    expect(loadMore).toHaveBeenCalledWith({ page: 2 });
+    expect(shadow.querySelector(".fs-list-more")).toBeNull();
+    expect(
+      [...shadow.querySelectorAll(".fs-item-title")].map((element) => element.textContent),
+    ).toContain("Topic Two");
+  });
 });

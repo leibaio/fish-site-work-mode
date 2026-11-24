@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 — 2026-11-24
+
+优化 linux.do 左栏话题数量。
+
+### 新增
+
+- 会话列表分页接口：`SiteAdapter.listConversations()` 可以返回 `ConversationPage`，并可选实现 `loadMoreConversations(cursor)`
+- 左栏底部新增「加载更多话题」按钮，加载后保持滚动位置并去重
+- linux.do 首次加载最新话题第 1、2 页（约 60 条），之后按页继续加载
+- linux.do 修正分页起点：从 `page=0`（第 1 页）开始，不再跳过最前面的话题
+- 新增 linux.do 两页合并、侧栏加载更多、`autoOpenFirst` 等测试，测试总数 39
+
 ## 0.6.0 — 2026-11-23
 
 新增豆瓣小组适配器。

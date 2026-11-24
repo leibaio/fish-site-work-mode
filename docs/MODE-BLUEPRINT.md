@@ -172,6 +172,12 @@ export interface ContentView {
   kind: ContentKind;
 }
 
+export interface ConversationPage {
+  conversations: Conversation[];
+  hasMore: boolean;
+  cursor?: unknown;
+}
+
 export interface SiteAdapter {
   id: string;                       // "linuxdo" | "zhihu" | ...
   label: string;
@@ -180,8 +186,11 @@ export interface SiteAdapter {
   /** 页面就绪后探测是否是受支持的页面；返回 null 表示不接管 */
   detect(): Promise<SiteContext | null>;
 
-  /** 左栏会话 / 帖子 / 书 / 主题 */
-  listConversations(ctx: SiteContext): Promise<Conversation[]>;
+  /** 左栏会话 / 帖子 / 书 / 主题；返回数组或带分页信息的 ConversationPage */
+  listConversations(): Promise<Conversation[] | ConversationPage>;
+
+  /** 可选：左栏「加载更多」 */
+  loadMoreConversations?(cursor: unknown): Promise<ConversationPage>;
 
   /** 打开一条会话，返回可渲染的内容 */
   openConversation(id: string): Promise<ContentView>;
