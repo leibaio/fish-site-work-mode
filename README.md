@@ -35,6 +35,13 @@
 - 窗口宽度小于 1000px 时不接管页面
 - 右上角 `⏏` 退出后，右下角保留一个悬浮球，点击恢复
 
+### 搜索
+
+- linux.do 左栏支持搜索：输入关键词后按回车或点「搜」
+- 搜索结果可以直接打开；结果较多时底部可「加载更多结果」
+- 点 `×` 清除搜索，恢复原来的最近话题列表
+- 工作目录模式下会隐藏搜索框，避免在伪装界面里暴露关键词
+
 ### 工作伪装
 
 - 点击左上角「微信」字样，切换成「工作目录」
@@ -60,7 +67,8 @@
 
 ### 图片
 
-- 正文图片默认缩小到最大 **360 × 280**，不再撑满阅读区
+- 正文图片默认显示 **88 × 60** 的小缩略图（`object-fit: cover`），尽量不显眼
+- emoji、小图标、头像不会套用缩略图样式
 - 点击图片打开灯箱放大，支持 `Esc`、点击空白处或右上角关闭
 - 微博 `orj360`、知乎 `_b`、豆瓣 `/small/` 等缩略图会尝试换成大图；换图失败会自动回退原图
 - 小图标 / emoji 不会触发灯箱
@@ -197,6 +205,7 @@ dist/
 | --- | --- |
 | 最近话题 | `GET /latest.json`（第 1 页）、`GET /latest.json?page=1`（第 2 页） |
 | 左栏加载更多 | `GET /latest.json?page=<n>`，按 `more_topics_url` 判断是否还有下一页 |
+| 左栏搜索 | `GET /search.json?q=<关键词>&page=<n>`，结果按 topic 去重，带匹配摘要 |
 | 话题详情 | `GET /t/<topicId>.json` |
 | 加载更多楼层 | `GET /t/<topicId>/posts.json?post_ids[]=...` |
 
@@ -282,7 +291,7 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 
 | 站点 | 状态 | 备注 |
 | --- | --- | --- |
-| linux.do | ✅ 可用 | Discourse，JSON 接口稳定；左栏支持分页加载 |
+| linux.do | ✅ 可用 | Discourse，JSON 接口稳定；左栏支持分页与搜索 |
 | V2EX | ✅ 可用 | 公开 JSON API，主题 + 全部回复 |
 | Chiphell | ✅ 可用 | Discuz，版块/帖子 HTML + 分页 |
 | 虎扑 | ✅ 可用 | BBS HTML，步行街列表 + 帖子分页 |
@@ -297,7 +306,9 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 ## 已知限制
 
 - linux.do / V2EX / Chiphell / 虎扑都是**只读**的：可以浏览、翻页、切换话题，但不能发帖、回复、点赞、收藏
-- linux.do 左栏默认加载最新前两页，底部可以继续「加载更多话题」；V2EX 节点页通过 API 拉取该节点最新 10 条，暂未做翻页
+- linux.do 左栏默认加载最新前两页，底部可以继续「加载更多话题」；搜索目前只在 linux.do 提供，其他站点后续可复用 `searchConversations` 接口
+- V2EX 节点页通过 API 拉取该节点最新 10 条，暂未做翻页
+- 正文图片默认显示 88 × 60 缩略图，点击灯箱看原图；不适合用极小图阅读的场景可以用灯箱
 - V2EX 的回复由公开 API 一次性返回；超长主题如果被服务端截断，工作台不会自动补页
 - Chiphell 在首页使用默认版块「电脑讨论(新)」（fid=146）；帖子页会跟随当前帖子所在版块
 - 虎扑默认支持步行街主干道（`/bxj`、`/topic-daily`）；帖子页会尝试跟随面包屑里的父版块
@@ -329,8 +340,8 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 # 1. 修改 package.json 的 version，并更新 CHANGELOG.md
 npm run check
 git add dist package.json CHANGELOG.md
-git commit -m "chore: release v0.8.1"
-git tag v0.8.1
+git commit -m "chore: release v0.9.1"
+git tag v0.9.1
 git push origin main --tags
 ```
 

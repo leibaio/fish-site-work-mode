@@ -40,6 +40,19 @@ interface DiscourseLatest {
   topic_list?: { topics?: DiscourseTopic[]; more_topics_url?: string };
 }
 
+interface DiscourseSearchPost {
+  topic_id?: number;
+  blurb?: string;
+  username?: string;
+  avatar_template?: string;
+}
+
+interface DiscourseSearch {
+  topics?: DiscourseTopic[];
+  posts?: DiscourseSearchPost[];
+  grouped_search_result?: { more_full_search?: boolean };
+}
+
 interface DiscoursePost {
   id: number;
   username: string;
@@ -116,6 +129,40 @@ export function latestToConversations(data: DiscourseLatest): Conversation[] {
       unread: Boolean(topic.unseen || topic.unread || Number(topic.unread_posts || 0) > 0),
     };
   });
+}
+
+function stripHtml(value?: string): string {
+  if (!value) return "";
+  const doc = new DOMParser().parseFromString(value, "text/html");
+  return String(doc.body?.textContent || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function searchToConversations(data: DiscourseSearch): Conversation[] {
+  const posts = new Map<number, DiscourseSearchPost>();
+  for (const post of data.posts ?? []) {
+    if (post.topic_id && !posts.has(post.topic_id)) posts.set(post.topic_id, post);
+  }
+
+  const seen = new Set<number>();
+  const conversations: Conversation[] = [];
+  for (const topic of data.topics ?? []) {
+    if (!topic || seen.has(topic.id)) continue;
+    seen.add(topic.id);
+    const post = posts.get(topic.id);
+    const replies = Math.max(0, Number(topic.posts_count || 1) - 1);
+    const blurb = stripHtml(post?.blurb);
+    const subtitle = [`${replies} 回复`, blurb].filter(Boolean).join(" · ");
+    conversations.push({
+      id: String(topic.id),
+      title: topicTitle(topic),
+      subtitle,
+      avatar: avatarUrl(post?.avatar_template),
+      updatedAt: toTimestamp(topic.bumped_at || topic.last_posted_at || topic.created_at),
+    });
+  }
+  return conversations;
 }
 
 function postAvatar(post: DiscoursePost, participants: Map<string, string>): string {
@@ -273,6 +320,23 @@ export const linuxdoAdapter: SiteAdapter = {
     return {
       conversations: latestToConversations(data),
       hasMore: Boolean(data.topic_list?.more_topics_url),
+      cursor: { page: page + 1 },
+    };
+  },
+
+  async searchConversations(query: string, cursor?: unknown): Promise<ConversationPage> {
+    const rawPage =
+      cursor && typeof cursor === "object" && "page" in cursor
+        ? Number((cursor as { page: number }).page)
+        : 1;
+    const page = Number.isFinite(rawPage) && rawPage >= 1 ? rawPage : 1;
+    const data = await fetchJson<DiscourseSearch>(
+      `/search.json?q=${encodeURIComponent(query)}&page=${page}`,
+    );
+    const conversations = searchToConversations(data);
+    return {
+      conversations,
+      hasMore: Boolean(data.grouped_search_result?.more_full_search) || conversations.length >= 20,
       cursor: { page: page + 1 },
     };
   },

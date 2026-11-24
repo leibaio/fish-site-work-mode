@@ -192,6 +192,9 @@ export interface SiteAdapter {
   /** 可选：左栏「加载更多」 */
   loadMoreConversations?(cursor: unknown): Promise<ConversationPage>;
 
+  /** 可选：左栏搜索 */
+  searchConversations?(query: string, cursor?: unknown): Promise<ConversationPage>;
+
   /** 打开一条会话，返回可渲染的内容 */
   openConversation(id: string): Promise<ContentView>;
 

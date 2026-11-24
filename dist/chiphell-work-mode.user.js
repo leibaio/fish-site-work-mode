@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         工作台 · Chiphell
 // @namespace    fish-site-work-mode
-// @version      0.8.0
+// @version      0.9.0
 // @description  把 Chiphell 变成工作台：左栏帖子、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT
@@ -144,6 +144,20 @@
   padding: 4px 6px; border-radius: 4px; line-height: 1;
 }
 .fs-refresh:hover { background: #ececec; color: #555; }
+.fs-search { display: flex; align-items: center; gap: 6px; padding: 0 12px 8px; }
+.fs-search[hidden] { display: none; }
+.fs-search-input {
+  flex: 1; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid #e2e2e2;
+  border-radius: 6px; background: #fff; color: #333; font: 12px/1.4 inherit; outline: none;
+}
+.fs-search-input:focus { border-color: #07c160; }
+.fs-search-clear, .fs-search-submit {
+  height: 26px; min-width: 26px; padding: 0 6px; border: 0; border-radius: 5px;
+  background: #ececec; color: #666; cursor: pointer; font: 12px/1 inherit;
+}
+.fs-search-clear { background: transparent; font-size: 15px; }
+.fs-search-clear:hover, .fs-search-submit:hover { background: #e0e0e0; color: #111; }
+.fs-search-clear[hidden] { display: none; }
 .fs-list { flex: 1; overflow: auto; padding-bottom: 8px; }
 .fs-item { display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer; }
 .fs-item:hover { background: #ececec; }
@@ -237,10 +251,17 @@
 .fs-post-body hr { border: 0; border-top: 1px solid #eee; margin: 1.2em 0; }
 .fs-post-body figure { margin: 1em 0; }
 .fs-post-body figcaption { margin-top: 6px; color: #999; font-size: 12px; text-align: center; }
-.fs-post-body img {
-  max-width: min(100%, 360px); max-height: 280px; width: auto; height: auto;
-  object-fit: contain; border-radius: 4px; cursor: zoom-in; background: #f7f7f7;
-  vertical-align: middle; margin: 3px 0;
+.fs-post-body img { max-width: 100%; height: auto; }
+.fs-post-body img.fs-thumb-img {
+  width: 88px; height: 60px; max-width: 88px; max-height: 60px; object-fit: cover;
+  border: 1px solid #ececec; background: #f4f4f4; cursor: zoom-in; border-radius: 4px;
+  margin: 2px 4px 2px 0; vertical-align: middle;
+}
+.fs-post-body img.fs-thumb-img:hover { border-color: #07c160; }
+.fs-post-body img.fs-inline-img {
+  width: auto; height: auto; max-width: 100%; max-height: 1.6em; border: 0;
+  background: transparent; border-radius: 2px; cursor: default; margin: 0 1px;
+  vertical-align: -0.2em;
 }
 .fs-post-body video { max-width: 100%; height: auto; border-radius: 4px; }
 .fs-post-body pre {
@@ -541,6 +562,11 @@
       listCursor: void 0,
       listHasMore: false,
       listLoading: false,
+      searchMode: false,
+      searchQuery: "",
+      savedConversations: [],
+      savedCursor: void 0,
+      savedHasMore: false,
       openToken: 0
     };
     const workIndex = /* @__PURE__ */ new Map();
@@ -566,6 +592,11 @@
         <div class="fs-side-head">
           <button class="fs-brand" id="fs-brand"></button>
           <button class="fs-refresh" id="fs-refresh" title="刷新">↻</button>
+        </div>
+        <div class="fs-search" id="fs-search" hidden>
+          <input class="fs-search-input" id="fs-search-input" type="search" autocomplete="off" spellcheck="false" />
+          <button class="fs-search-clear" id="fs-search-clear" type="button" title="清除搜索" hidden>×</button>
+          <button class="fs-search-submit" id="fs-search-submit" type="button" title="搜索">搜</button>
         </div>
         <div class="fs-list" id="fs-list"></div>
         <div class="fs-side-foot" id="fs-side-foot"></div>
@@ -607,6 +638,10 @@
     const side = must("#fs-side");
     const brand = must("#fs-brand");
     const refreshBtn = must("#fs-refresh");
+    const searchRow = must("#fs-search");
+    const searchInput = must("#fs-search-input");
+    const searchClear = must("#fs-search-clear");
+    const searchSubmit = must("#fs-search-submit");
     const list = must("#fs-list");
     const sideFoot = must("#fs-side-foot");
     const headCover = must("#fs-head-cover");
@@ -631,6 +666,7 @@
     let logStarted = false;
     let stopLogs = null;
     let toastTimer = 0;
+    let searchToken = 0;
     const conversationById = (id) => state.conversations.find((conversation) => conversation.id === id);
     function toast(message) {
       toastEl.textContent = message;
@@ -783,6 +819,13 @@
       brand.title = state.workMode ? "点击恢复会话列表" : "点击切换工作目录";
       sideFoot.textContent = state.workMode ? coverStory.footer : "最近会话";
     }
+    function updateSearchUi() {
+      const supported = Boolean(adapter.searchConversations);
+      searchRow.hidden = !supported || state.workMode;
+      if (!supported) return;
+      searchInput.placeholder = `搜索 ${adapter.label}…`;
+      searchClear.hidden = !state.searchMode && !searchInput.value.trim();
+    }
     function renderTree(nodes, depth, base) {
       return nodes.map((node) => {
         const path = base ? `${base}/${node.name}` : node.name;
@@ -828,7 +871,7 @@
     }
     function renderConversationList() {
       if (!state.conversations.length) {
-        const label = state.listError ? "加载失败" : state.dataLoaded ? "暂无话题" : "加载中…";
+        const label = state.listError ? "加载失败" : state.listLoading ? "搜索中…" : state.searchMode ? "没有找到相关话题" : state.dataLoaded ? "暂无话题" : "加载中…";
         list.innerHTML = `<div class="fs-empty"${state.listError ? ` title="${escapeAttr(state.listError)}"` : ""}>${label}</div>`;
         return;
       }
@@ -846,11 +889,13 @@
           ${conversation.unread ? `<span class="fs-item-unread"></span>` : `<span class="fs-item-time">${escapeHtml(timeAgo(conversation.updatedAt))}</span>`}
         </div>`;
       }).join("");
-      const more = state.listHasMore && adapter.loadMoreConversations ? `<button class="fs-list-more" type="button"${state.listLoading ? " disabled" : ""}>${state.listLoading ? "加载中…" : "加载更多话题"}</button>` : "";
+      const moreAvailable = state.searchMode ? Boolean(adapter.searchConversations) : Boolean(adapter.loadMoreConversations);
+      const more = state.listHasMore && moreAvailable ? `<button class="fs-list-more" type="button"${state.listLoading ? " disabled" : ""}>${state.listLoading ? "加载中…" : state.searchMode ? "加载更多结果" : "加载更多话题"}</button>` : "";
       list.innerHTML = items + more;
     }
     function renderSidebar() {
       setBrandAndFoot();
+      updateSearchUi();
       if (state.workMode) renderWorkTree();
       else renderConversationList();
     }
@@ -875,11 +920,32 @@
       }
       const more = view.hasMore && adapter.loadMore ? `<button class="fs-more" type="button">加载更多回复</button>` : "";
       content.innerHTML = `<div class="fs-doc">${sanitizeHtml(view.html)}${more}</div>`;
+      decorateContentImages(content);
       const moreButton = content.querySelector(".fs-more");
       if (moreButton) {
         moreButton.addEventListener("click", () => void handleLoadMore(moreButton));
       }
       content.scrollTop = 0;
+    }
+    function decorateContentImages(root) {
+      root.querySelectorAll(".fs-post-body img").forEach((image) => {
+        const className = String(image.className);
+        const width = Number(image.getAttribute("width") || 0);
+        const height = Number(image.getAttribute("height") || 0);
+        if (/emoji|emoticon|emotion|icon|avatar/i.test(className) || width > 0 && height > 0 && (width <= 48 || height <= 48)) {
+          image.classList.add("fs-inline-img");
+          return;
+        }
+        image.classList.add("fs-thumb-img");
+        const markInline = () => {
+          if (image.naturalWidth > 0 && image.naturalHeight > 0 && (image.naturalWidth < 48 || image.naturalHeight < 48)) {
+            image.classList.add("fs-inline-img");
+            image.classList.remove("fs-thumb-img");
+          }
+        };
+        if (image.complete) markInline();
+        else image.addEventListener("load", markInline, { once: true });
+      });
     }
     async function handleLoadMore(button) {
       const view = state.currentView;
@@ -895,6 +961,7 @@
         const temp = document.createElement("div");
         temp.innerHTML = sanitizeHtml(result.html);
         while (temp.firstChild) doc.insertBefore(temp.firstChild, button);
+        decorateContentImages(doc);
         view.hasMore = result.hasMore;
         view.cursor = result.cursor;
         if (!result.hasMore) button.remove();
@@ -968,6 +1035,10 @@
       }
     }
     async function refreshConversations() {
+      if (state.searchMode && adapter.searchConversations) {
+        await runSearch(state.searchQuery);
+        return;
+      }
       try {
         const page = normalizeConversationPage(await adapter.listConversations());
         state.conversations = page.conversations;
@@ -984,16 +1055,92 @@
         toast(`刷新失败：${error instanceof Error ? error.message : String(error)}`);
       }
     }
+    async function runSearch(query) {
+      if (!adapter.searchConversations) return;
+      const text = (query ?? searchInput.value).trim();
+      if (!text) {
+        clearSearch();
+        return;
+      }
+      searchInput.value = text;
+      if (!state.searchMode) {
+        state.savedConversations = state.conversations.slice();
+        state.savedCursor = state.listCursor;
+        state.savedHasMore = state.listHasMore;
+      }
+      const token = ++searchToken;
+      state.searchMode = true;
+      state.searchQuery = text;
+      state.listError = "";
+      state.listLoading = true;
+      state.conversations = [];
+      state.listCursor = void 0;
+      state.listHasMore = false;
+      renderSidebar();
+      try {
+        const page = await adapter.searchConversations(text);
+        if (token !== searchToken) return;
+        state.conversations = page.conversations;
+        state.listCursor = page.cursor;
+        state.listHasMore = page.hasMore;
+        state.listLoading = false;
+        state.listError = "";
+        renderSidebar();
+        if (!page.conversations.length) toast("没有找到相关话题");
+      } catch (error) {
+        if (token !== searchToken) return;
+        state.listLoading = false;
+        state.listError = error instanceof Error ? error.message : String(error);
+        state.conversations = [];
+        state.listHasMore = false;
+        renderSidebar();
+        toast(`搜索失败：${state.listError}`);
+      }
+    }
+    function clearSearch() {
+      if (!state.searchMode && !searchInput.value) return;
+      searchToken++;
+      state.searchMode = false;
+      state.searchQuery = "";
+      state.listError = "";
+      state.listLoading = false;
+      searchInput.value = "";
+      if (state.savedConversations.length) {
+        state.conversations = state.savedConversations;
+        state.listCursor = state.savedCursor;
+        state.listHasMore = state.savedHasMore;
+        state.savedConversations = [];
+        state.savedCursor = void 0;
+        state.savedHasMore = false;
+        renderSidebar();
+      } else {
+        state.savedConversations = [];
+        state.savedCursor = void 0;
+        state.savedHasMore = false;
+        state.conversations = [];
+        state.listCursor = void 0;
+        state.listHasMore = false;
+        renderSidebar();
+        void refreshConversations();
+      }
+    }
     async function loadMoreConversations() {
-      if (!adapter.loadMoreConversations || !state.listHasMore || state.listLoading) return;
+      if (!state.listHasMore || state.listLoading) return;
+      const isSearch = state.searchMode;
+      if (isSearch && !adapter.searchConversations) return;
+      if (!isSearch && !adapter.loadMoreConversations) return;
       state.listLoading = true;
       const button = list.querySelector(".fs-list-more");
       if (button) {
         button.disabled = true;
         button.textContent = "加载中…";
       }
+      const expectedQuery = state.searchQuery;
       try {
-        const page = await adapter.loadMoreConversations(state.listCursor);
+        const page = isSearch ? await adapter.searchConversations(expectedQuery, state.listCursor) : await adapter.loadMoreConversations(state.listCursor);
+        if (state.searchMode !== isSearch || isSearch && state.searchQuery !== expectedQuery) {
+          return;
+        }
         const existing = new Set(state.conversations.map((conversation) => conversation.id));
         const added = page.conversations.filter((conversation) => !existing.has(conversation.id));
         const scrollTop = list.scrollTop;
@@ -1003,8 +1150,9 @@
         state.listLoading = false;
         renderSidebar();
         list.scrollTop = scrollTop;
-        if (added.length) toast(`已加载 ${added.length} 条话题`);
+        if (added.length) toast(`已加载 ${added.length} 条${isSearch ? "结果" : "话题"}`);
       } catch (error) {
+        if (state.searchMode !== isSearch) return;
         state.listLoading = false;
         renderSidebar();
         toast(`加载更多失败：${error instanceof Error ? error.message : String(error)}`);
@@ -1115,7 +1263,8 @@
         const rect = image.getBoundingClientRect();
         const width = rect.width || image.naturalWidth || image.width;
         const height = rect.height || image.naturalHeight || image.height;
-        if (width >= 48 && height >= 48) {
+        const tiny = image.naturalWidth > 0 && image.naturalHeight > 0 && (image.naturalWidth < 48 || image.naturalHeight < 48);
+        if (!tiny && width >= 48 && height >= 48) {
           event.preventDefault();
           event.stopPropagation();
           openLightbox(image);
@@ -1193,6 +1342,23 @@
         return;
       }
       void refreshConversations();
+    });
+    searchSubmit.addEventListener("click", () => void runSearch());
+    searchClear.addEventListener("click", () => {
+      clearSearch();
+      searchInput.focus();
+    });
+    searchInput.addEventListener("input", updateSearchUi);
+    searchInput.addEventListener("keydown", (event) => {
+      event.stopPropagation();
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void runSearch();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        clearSearch();
+        searchInput.blur();
+      }
     });
     headTitle.addEventListener("click", toggleLogsOnly);
     logBtn.addEventListener("click", toggleLogsOnly);

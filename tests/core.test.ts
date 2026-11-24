@@ -196,6 +196,7 @@ describe("core shell", () => {
     await waitFor(() => !!shadow.querySelector(".fs-post-body img"));
 
     const image = shadow.querySelector(".fs-post-body img") as HTMLImageElement;
+    expect(image.classList.contains("fs-thumb-img")).toBe(true);
     image.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect((shadow.querySelector("#fs-lightbox") as HTMLElement).hidden).toBe(false);
     expect(
@@ -204,5 +205,43 @@ describe("core shell", () => {
 
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect((shadow.querySelector("#fs-lightbox") as HTMLElement).hidden).toBe(true);
+  });
+
+  it("searches conversations and restores the latest list", async () => {
+    const adapter = mockAdapter();
+    adapter.listConversations = async () => [
+      { id: "1", title: "Latest Topic", subtitle: "latest", updatedAt: Date.now() },
+    ];
+    adapter.searchConversations = vi.fn(async (query: string) => ({
+      conversations: [
+        { id: "2", title: "Search Result", subtitle: query, updatedAt: Date.now() },
+      ],
+      hasMore: false,
+      cursor: undefined,
+    }));
+
+    handle = await startApp(adapter, coverStory);
+    const shadow = handle!.shadow;
+    await waitFor(() => !(shadow.querySelector("#fs-search") as HTMLElement).hidden);
+
+    const input = shadow.querySelector("#fs-search-input") as HTMLInputElement;
+    input.value = "hello";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await waitFor(() =>
+      [...shadow.querySelectorAll(".fs-item-title")].some(
+        (element) => element.textContent === "Search Result",
+      ),
+    );
+
+    expect(adapter.searchConversations).toHaveBeenCalledWith("hello");
+    expect((shadow.querySelector("#fs-search-clear") as HTMLElement).hidden).toBe(false);
+
+    (shadow.querySelector("#fs-search-clear") as HTMLButtonElement).click();
+    await waitFor(() =>
+      [...shadow.querySelectorAll(".fs-item-title")].some(
+        (element) => element.textContent === "Latest Topic",
+      ),
+    );
+    expect((shadow.querySelector("#fs-search-input") as HTMLInputElement).value).toBe("");
   });
 });

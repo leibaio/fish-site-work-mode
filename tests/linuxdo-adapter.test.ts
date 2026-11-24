@@ -5,6 +5,7 @@ import {
   latestToConversations,
   linuxdoAdapter,
   parseTopic,
+  searchToConversations,
 } from "../packages/adapters/linuxdo/src/adapter";
 
 function jsonResponse(payload: unknown): Response {
@@ -191,5 +192,50 @@ describe("linux.do adapter", () => {
     expect(page?.conversations.map((conversation) => conversation.id)).toEqual(["3"]);
     expect(page?.hasMore).toBe(false);
     expect(page?.cursor).toEqual({ page: 3 });
+  });
+
+  it("maps search results with blurbs and removes duplicate topics", () => {
+    const conversations = searchToConversations({
+      topics: [
+        { id: 1, title: "Search One", posts_count: 3, bumped_at: "2026-11-23T00:00:00.000Z" },
+        { id: 2, title: "Search Two", posts_count: 1, created_at: "2026-11-22T00:00:00.000Z" },
+        { id: 1, title: "Search One", posts_count: 3 },
+      ],
+      posts: [
+        { topic_id: 1, blurb: "<b>hello</b> world", avatar_template: "/avatar/{size}.png" },
+        { topic_id: 2, blurb: "second" },
+      ],
+    });
+
+    expect(conversations).toHaveLength(2);
+    expect(conversations[0].title).toBe("Search One");
+    expect(conversations[0].subtitle).toContain("2 回复");
+    expect(conversations[0].subtitle).toContain("hello world");
+    expect(conversations[0].avatar).toContain("/avatar/96.png");
+    expect(conversations[1].subtitle).toContain("second");
+  });
+
+  it("searches topics through search.json", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), "https://linux.do");
+      expect(url.pathname).toBe("/search.json");
+      expect(url.searchParams.get("q")).toBe("你好 topic");
+      expect(url.searchParams.get("page")).toBe("1");
+      return jsonResponse({
+        topics: [
+          { id: 9, title: "Found topic", posts_count: 2, bumped_at: "2026-11-23T00:00:00.000Z" },
+        ],
+        posts: [{ topic_id: 9, blurb: "matched <b>text</b>" }],
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const page = await linuxdoAdapter.searchConversations!("你好 topic");
+
+    expect(page.conversations).toHaveLength(1);
+    expect(page.conversations[0].title).toBe("Found topic");
+    expect(page.conversations[0].subtitle).toContain("matched text");
+    expect(page.hasMore).toBe(false);
+    expect(page.cursor).toEqual({ page: 2 });
   });
 });

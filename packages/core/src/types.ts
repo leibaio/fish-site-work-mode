@@ -82,6 +82,8 @@ export interface SiteAdapter {
   detect(): Promise<SiteContext | null>;
   listConversations(): Promise<Conversation[] | ConversationPage>;
   loadMoreConversations?(cursor: unknown): Promise<ConversationPage>;
+  /** 可选：左栏搜索；返回结果会替换会话列表 */
+  searchConversations?(query: string, cursor?: unknown): Promise<ConversationPage>;
   openConversation(id: string): Promise<ContentView>;
   loadMore?(id: string, cursor: unknown): Promise<LoadMoreResult>;
   initialConversationId?(ctx: SiteContext): string | null;

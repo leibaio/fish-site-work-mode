@@ -24,6 +24,20 @@ export const STYLES = `
   padding: 4px 6px; border-radius: 4px; line-height: 1;
 }
 .fs-refresh:hover { background: #ececec; color: #555; }
+.fs-search { display: flex; align-items: center; gap: 6px; padding: 0 12px 8px; }
+.fs-search[hidden] { display: none; }
+.fs-search-input {
+  flex: 1; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid #e2e2e2;
+  border-radius: 6px; background: #fff; color: #333; font: 12px/1.4 inherit; outline: none;
+}
+.fs-search-input:focus { border-color: #07c160; }
+.fs-search-clear, .fs-search-submit {
+  height: 26px; min-width: 26px; padding: 0 6px; border: 0; border-radius: 5px;
+  background: #ececec; color: #666; cursor: pointer; font: 12px/1 inherit;
+}
+.fs-search-clear { background: transparent; font-size: 15px; }
+.fs-search-clear:hover, .fs-search-submit:hover { background: #e0e0e0; color: #111; }
+.fs-search-clear[hidden] { display: none; }
 .fs-list { flex: 1; overflow: auto; padding-bottom: 8px; }
 .fs-item { display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer; }
 .fs-item:hover { background: #ececec; }
@@ -117,10 +131,17 @@ export const STYLES = `
 .fs-post-body hr { border: 0; border-top: 1px solid #eee; margin: 1.2em 0; }
 .fs-post-body figure { margin: 1em 0; }
 .fs-post-body figcaption { margin-top: 6px; color: #999; font-size: 12px; text-align: center; }
-.fs-post-body img {
-  max-width: min(100%, 360px); max-height: 280px; width: auto; height: auto;
-  object-fit: contain; border-radius: 4px; cursor: zoom-in; background: #f7f7f7;
-  vertical-align: middle; margin: 3px 0;
+.fs-post-body img { max-width: 100%; height: auto; }
+.fs-post-body img.fs-thumb-img {
+  width: 88px; height: 60px; max-width: 88px; max-height: 60px; object-fit: cover;
+  border: 1px solid #ececec; background: #f4f4f4; cursor: zoom-in; border-radius: 4px;
+  margin: 2px 4px 2px 0; vertical-align: middle;
+}
+.fs-post-body img.fs-thumb-img:hover { border-color: #07c160; }
+.fs-post-body img.fs-inline-img {
+  width: auto; height: auto; max-width: 100%; max-height: 1.6em; border: 0;
+  background: transparent; border-radius: 2px; cursor: default; margin: 0 1px;
+  vertical-align: -0.2em;
 }
 .fs-post-body video { max-width: 100%; height: auto; border-radius: 4px; }
 .fs-post-body pre {

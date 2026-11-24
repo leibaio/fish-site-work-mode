@@ -56,6 +56,11 @@ export interface AppState {
   listCursor: unknown;
   listHasMore: boolean;
   listLoading: boolean;
+  searchMode: boolean;
+  searchQuery: string;
+  savedConversations: Conversation[];
+  savedCursor: unknown;
+  savedHasMore: boolean;
   openToken: number;
 }
 
@@ -163,6 +168,11 @@ export async function startApp(
     listCursor: undefined,
     listHasMore: false,
     listLoading: false,
+    searchMode: false,
+    searchQuery: "",
+    savedConversations: [],
+    savedCursor: undefined,
+    savedHasMore: false,
     openToken: 0,
   };
 
@@ -190,6 +200,11 @@ export async function startApp(
         <div class="fs-side-head">
           <button class="fs-brand" id="fs-brand"></button>
           <button class="fs-refresh" id="fs-refresh" title="刷新">↻</button>
+        </div>
+        <div class="fs-search" id="fs-search" hidden>
+          <input class="fs-search-input" id="fs-search-input" type="search" autocomplete="off" spellcheck="false" />
+          <button class="fs-search-clear" id="fs-search-clear" type="button" title="清除搜索" hidden>×</button>
+          <button class="fs-search-submit" id="fs-search-submit" type="button" title="搜索">搜</button>
         </div>
         <div class="fs-list" id="fs-list"></div>
         <div class="fs-side-foot" id="fs-side-foot"></div>
@@ -233,6 +248,10 @@ export async function startApp(
   const side = must<HTMLElement>("#fs-side");
   const brand = must<HTMLButtonElement>("#fs-brand");
   const refreshBtn = must<HTMLButtonElement>("#fs-refresh");
+  const searchRow = must<HTMLElement>("#fs-search");
+  const searchInput = must<HTMLInputElement>("#fs-search-input");
+  const searchClear = must<HTMLButtonElement>("#fs-search-clear");
+  const searchSubmit = must<HTMLButtonElement>("#fs-search-submit");
   const list = must<HTMLElement>("#fs-list");
   const sideFoot = must<HTMLElement>("#fs-side-foot");
   const headCover = must<HTMLElement>("#fs-head-cover");
@@ -258,6 +277,7 @@ export async function startApp(
   let logStarted = false;
   let stopLogs: (() => void) | null = null;
   let toastTimer = 0;
+  let searchToken = 0;
 
   const conversationById = (id: string): Conversation | undefined =>
     state.conversations.find((conversation) => conversation.id === id);
@@ -435,6 +455,14 @@ export async function startApp(
     sideFoot.textContent = state.workMode ? coverStory.footer : "最近会话";
   }
 
+  function updateSearchUi(): void {
+    const supported = Boolean(adapter.searchConversations);
+    searchRow.hidden = !supported || state.workMode;
+    if (!supported) return;
+    searchInput.placeholder = `搜索 ${adapter.label}…`;
+    searchClear.hidden = !state.searchMode && !searchInput.value.trim();
+  }
+
   function renderTree(nodes: WorkNode[], depth: number, base: string): string {
     return nodes
       .map((node) => {
@@ -497,7 +525,15 @@ export async function startApp(
 
   function renderConversationList(): void {
     if (!state.conversations.length) {
-      const label = state.listError ? "加载失败" : state.dataLoaded ? "暂无话题" : "加载中…";
+      const label = state.listError
+        ? "加载失败"
+        : state.listLoading
+          ? "搜索中…"
+          : state.searchMode
+            ? "没有找到相关话题"
+            : state.dataLoaded
+              ? "暂无话题"
+              : "加载中…";
       list.innerHTML = `<div class="fs-empty"${
         state.listError ? ` title="${escapeAttr(state.listError)}"` : ""
       }>${label}</div>`;
@@ -525,17 +561,21 @@ export async function startApp(
       })
       .join("");
 
+    const moreAvailable = state.searchMode
+      ? Boolean(adapter.searchConversations)
+      : Boolean(adapter.loadMoreConversations);
     const more =
-      state.listHasMore && adapter.loadMoreConversations
+      state.listHasMore && moreAvailable
         ? `<button class="fs-list-more" type="button"${
             state.listLoading ? " disabled" : ""
-          }>${state.listLoading ? "加载中…" : "加载更多话题"}</button>`
+          }>${state.listLoading ? "加载中…" : state.searchMode ? "加载更多结果" : "加载更多话题"}</button>`
         : "";
     list.innerHTML = items + more;
   }
 
   function renderSidebar(): void {
     setBrandAndFoot();
+    updateSearchUi();
     if (state.workMode) renderWorkTree();
     else renderConversationList();
   }
@@ -571,11 +611,41 @@ export async function startApp(
     const more =
       view.hasMore && adapter.loadMore ? `<button class="fs-more" type="button">加载更多回复</button>` : "";
     content.innerHTML = `<div class="fs-doc">${sanitizeHtml(view.html)}${more}</div>`;
+    decorateContentImages(content);
     const moreButton = content.querySelector<HTMLButtonElement>(".fs-more");
     if (moreButton) {
       moreButton.addEventListener("click", () => void handleLoadMore(moreButton));
     }
     content.scrollTop = 0;
+  }
+
+  function decorateContentImages(root: ParentNode): void {
+    root.querySelectorAll<HTMLImageElement>(".fs-post-body img").forEach((image) => {
+      const className = String(image.className);
+      const width = Number(image.getAttribute("width") || 0);
+      const height = Number(image.getAttribute("height") || 0);
+      if (
+        /emoji|emoticon|emotion|icon|avatar/i.test(className) ||
+        (width > 0 && height > 0 && (width <= 48 || height <= 48))
+      ) {
+        image.classList.add("fs-inline-img");
+        return;
+      }
+
+      image.classList.add("fs-thumb-img");
+      const markInline = () => {
+        if (
+          image.naturalWidth > 0 &&
+          image.naturalHeight > 0 &&
+          (image.naturalWidth < 48 || image.naturalHeight < 48)
+        ) {
+          image.classList.add("fs-inline-img");
+          image.classList.remove("fs-thumb-img");
+        }
+      };
+      if (image.complete) markInline();
+      else image.addEventListener("load", markInline, { once: true });
+    });
   }
 
   async function handleLoadMore(button: HTMLButtonElement): Promise<void> {
@@ -592,6 +662,7 @@ export async function startApp(
       const temp = document.createElement("div");
       temp.innerHTML = sanitizeHtml(result.html);
       while (temp.firstChild) doc.insertBefore(temp.firstChild, button);
+      decorateContentImages(doc);
       view.hasMore = result.hasMore;
       view.cursor = result.cursor;
       if (!result.hasMore) button.remove();
@@ -671,6 +742,10 @@ export async function startApp(
   }
 
   async function refreshConversations(): Promise<void> {
+    if (state.searchMode && adapter.searchConversations) {
+      await runSearch(state.searchQuery);
+      return;
+    }
     try {
       const page = normalizeConversationPage(await adapter.listConversations());
       state.conversations = page.conversations;
@@ -688,16 +763,99 @@ export async function startApp(
     }
   }
 
+  async function runSearch(query?: string): Promise<void> {
+    if (!adapter.searchConversations) return;
+    const text = (query ?? searchInput.value).trim();
+    if (!text) {
+      clearSearch();
+      return;
+    }
+    searchInput.value = text;
+    if (!state.searchMode) {
+      state.savedConversations = state.conversations.slice();
+      state.savedCursor = state.listCursor;
+      state.savedHasMore = state.listHasMore;
+    }
+    const token = ++searchToken;
+    state.searchMode = true;
+    state.searchQuery = text;
+    state.listError = "";
+    state.listLoading = true;
+    state.conversations = [];
+    state.listCursor = undefined;
+    state.listHasMore = false;
+    renderSidebar();
+
+    try {
+      const page = await adapter.searchConversations(text);
+      if (token !== searchToken) return;
+      state.conversations = page.conversations;
+      state.listCursor = page.cursor;
+      state.listHasMore = page.hasMore;
+      state.listLoading = false;
+      state.listError = "";
+      renderSidebar();
+      if (!page.conversations.length) toast("没有找到相关话题");
+    } catch (error) {
+      if (token !== searchToken) return;
+      state.listLoading = false;
+      state.listError = error instanceof Error ? error.message : String(error);
+      state.conversations = [];
+      state.listHasMore = false;
+      renderSidebar();
+      toast(`搜索失败：${state.listError}`);
+    }
+  }
+
+  function clearSearch(): void {
+    if (!state.searchMode && !searchInput.value) return;
+    searchToken++;
+    state.searchMode = false;
+    state.searchQuery = "";
+    state.listError = "";
+    state.listLoading = false;
+    searchInput.value = "";
+
+    if (state.savedConversations.length) {
+      state.conversations = state.savedConversations;
+      state.listCursor = state.savedCursor;
+      state.listHasMore = state.savedHasMore;
+      state.savedConversations = [];
+      state.savedCursor = undefined;
+      state.savedHasMore = false;
+      renderSidebar();
+    } else {
+      state.savedConversations = [];
+      state.savedCursor = undefined;
+      state.savedHasMore = false;
+      state.conversations = [];
+      state.listCursor = undefined;
+      state.listHasMore = false;
+      renderSidebar();
+      void refreshConversations();
+    }
+  }
+
   async function loadMoreConversations(): Promise<void> {
-    if (!adapter.loadMoreConversations || !state.listHasMore || state.listLoading) return;
+    if (!state.listHasMore || state.listLoading) return;
+    const isSearch = state.searchMode;
+    if (isSearch && !adapter.searchConversations) return;
+    if (!isSearch && !adapter.loadMoreConversations) return;
+
     state.listLoading = true;
     const button = list.querySelector<HTMLButtonElement>(".fs-list-more");
     if (button) {
       button.disabled = true;
       button.textContent = "加载中…";
     }
+    const expectedQuery = state.searchQuery;
     try {
-      const page = await adapter.loadMoreConversations(state.listCursor);
+      const page = isSearch
+        ? await adapter.searchConversations!(expectedQuery, state.listCursor)
+        : await adapter.loadMoreConversations!(state.listCursor);
+      if (state.searchMode !== isSearch || (isSearch && state.searchQuery !== expectedQuery)) {
+        return;
+      }
       const existing = new Set(state.conversations.map((conversation) => conversation.id));
       const added = page.conversations.filter((conversation) => !existing.has(conversation.id));
       const scrollTop = list.scrollTop;
@@ -707,8 +865,9 @@ export async function startApp(
       state.listLoading = false;
       renderSidebar();
       list.scrollTop = scrollTop;
-      if (added.length) toast(`已加载 ${added.length} 条话题`);
+      if (added.length) toast(`已加载 ${added.length} 条${isSearch ? "结果" : "话题"}`);
     } catch (error) {
+      if (state.searchMode !== isSearch) return;
       state.listLoading = false;
       renderSidebar();
       toast(`加载更多失败：${error instanceof Error ? error.message : String(error)}`);
@@ -836,7 +995,11 @@ export async function startApp(
       const rect = image.getBoundingClientRect();
       const width = rect.width || image.naturalWidth || image.width;
       const height = rect.height || image.naturalHeight || image.height;
-      if (width >= 48 && height >= 48) {
+      const tiny =
+        image.naturalWidth > 0 &&
+        image.naturalHeight > 0 &&
+        (image.naturalWidth < 48 || image.naturalHeight < 48);
+      if (!tiny && width >= 48 && height >= 48) {
         event.preventDefault();
         event.stopPropagation();
         openLightbox(image);
@@ -917,6 +1080,23 @@ export async function startApp(
       return;
     }
     void refreshConversations();
+  });
+  searchSubmit.addEventListener("click", () => void runSearch());
+  searchClear.addEventListener("click", () => {
+    clearSearch();
+    searchInput.focus();
+  });
+  searchInput.addEventListener("input", updateSearchUi);
+  searchInput.addEventListener("keydown", (event) => {
+    event.stopPropagation();
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void runSearch();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      clearSearch();
+      searchInput.blur();
+    }
   });
   headTitle.addEventListener("click", toggleLogsOnly);
   logBtn.addEventListener("click", toggleLogsOnly);
