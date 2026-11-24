@@ -458,6 +458,29 @@ async function jikeApi<T>(
   return (await response.json()) as T;
 }
 
+async function jikeApiPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const token = jikeToken();
+  if (!token) throw new Error("未找到即刻登录凭证");
+  const url = new URL(path, JIKE_API);
+  const headers: Record<string, string> = {
+    accept: "application/json",
+    "content-type": "application/json",
+    platform: "web",
+    "x-jike-access-token": token,
+  };
+  const deviceId = jikeDeviceId();
+  if (deviceId) headers["x-jike-device-id"] = deviceId;
+
+  const response = await fetch(url.href, {
+    method: "POST",
+    headers,
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return (await response.json()) as T;
+}
+
 function feedEndpoint(url: URL): { path: string; label: string } | null {
   if (url.pathname === "/following" || url.pathname === "/following/") {
     return { path: FOLLOWING_FEED, label: "关注" };
@@ -741,7 +764,7 @@ export const jikeAdapter: SiteAdapter = {
 
     if (feed && jikeToken()) {
       try {
-        const data = await jikeApi<JikeFeedResponse>(feed.path, { limit: "20" });
+        const data = await jikeApiPost<JikeFeedResponse>(feed.path, { limit: 20 });
         const posts = Array.isArray(data.data) ? data.data : [];
         const conversations = posts
           .map((post) => apiPostToConversation(post, location.href))
@@ -791,8 +814,8 @@ export const jikeAdapter: SiteAdapter = {
       const state = cursor as { kind?: string; path?: string; loadMoreKey?: string };
       if (state.kind === "feed" && state.path && jikeToken()) {
         try {
-          const data = await jikeApi<JikeFeedResponse>(state.path, {
-            limit: "20",
+          const data = await jikeApiPost<JikeFeedResponse>(state.path, {
+            limit: 20,
             loadMoreKey: state.loadMoreKey,
           });
           const posts = Array.isArray(data.data) ? data.data : [];
@@ -822,9 +845,9 @@ export const jikeAdapter: SiteAdapter = {
       cursor && typeof cursor === "object" && "kind" in cursor
         ? (cursor as { kind?: string; loadMoreKey?: string })
         : null;
-    const data = await jikeApi<JikeSearchResponse>(SEARCH_API, {
+    const data = await jikeApiPost<JikeSearchResponse>(SEARCH_API, {
       keywords: query,
-      limit: "20",
+      limit: 20,
       loadMoreKey: state?.kind === "search" ? state.loadMoreKey : undefined,
     });
     const seen = new Set<string>();

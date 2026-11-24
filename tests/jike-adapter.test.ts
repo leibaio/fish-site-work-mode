@@ -101,7 +101,9 @@ describe("Jike adapter", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input));
       expect(url.pathname).toBe("/1.0/recommendFeed/list");
-      expect(url.searchParams.get("limit")).toBe("20");
+      expect(init?.method).toBe("POST");
+      const body = JSON.parse(String(init?.body)) as { limit: number };
+      expect(body.limit).toBe(20);
       const headers = init?.headers as Record<string, string>;
       expect(headers["x-jike-access-token"]).toBe("token-123");
       expect(headers["x-jike-device-id"]).toBe("device-456");
@@ -144,10 +146,12 @@ describe("Jike adapter", () => {
 
   it("searches through the integrate endpoint", async () => {
     localStorage.setItem("JK_ACCESS_TOKEN", "token-123");
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input));
       expect(url.pathname).toBe("/1.0/search/integrate");
-      expect(url.searchParams.get("keywords")).toBe("hello");
+      expect(init?.method).toBe("POST");
+      const body = JSON.parse(String(init?.body)) as { keywords: string };
+      expect(body.keywords).toBe("hello");
       return new Response(
         JSON.stringify({
           data: [
@@ -175,10 +179,12 @@ describe("Jike adapter", () => {
 
   it("loads more recommend posts with the cursor", async () => {
     localStorage.setItem("JK_ACCESS_TOKEN", "token-123");
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input));
       expect(url.pathname).toBe("/1.0/recommendFeed/list");
-      expect(url.searchParams.get("loadMoreKey")).toBe("next-key");
+      expect(init?.method).toBe("POST");
+      const body = JSON.parse(String(init?.body)) as { loadMoreKey: string };
+      expect(body.loadMoreKey).toBe("next-key");
       return new Response(
         JSON.stringify({
           data: [

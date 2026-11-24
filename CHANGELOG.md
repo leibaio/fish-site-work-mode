@@ -14,7 +14,7 @@
 - 即刻推荐流 / 关注流 API：
   - `/1.0/recommendFeed/list`
   - `/1.0/personalUpdate/followingUpdates`
-  - 使用页面已有的 `JK_ACCESS_TOKEN` / `JK_DEVICE_ID` 做只读 GET
+  - 使用页面已有的 `JK_ACCESS_TOKEN` / `JK_DEVICE_ID` 做只读请求（列表/搜索 POST，单条 GET）
 - 即刻搜索 API `/1.0/search/integrate`
 - 左栏「加载更多」使用 `loadMoreKey` 分页；API 不可用时回退 live DOM + 滚动加载
 - 左栏底部显示当前流：推荐 / 关注 / 用户动态 / 话题

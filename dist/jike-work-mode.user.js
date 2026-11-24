@@ -1901,6 +1901,27 @@
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
   }
+  async function jikeApiPost(path, body) {
+    const token = jikeToken();
+    if (!token) throw new Error("未找到即刻登录凭证");
+    const url = new URL(path, JIKE_API);
+    const headers = {
+      accept: "application/json",
+      "content-type": "application/json",
+      platform: "web",
+      "x-jike-access-token": token
+    };
+    const deviceId = jikeDeviceId();
+    if (deviceId) headers["x-jike-device-id"] = deviceId;
+    const response = await fetch(url.href, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  }
   function feedEndpoint(url) {
     if (url.pathname === "/following" || url.pathname === "/following/") {
       return { path: FOLLOWING_FEED, label: "关注" };
@@ -2112,7 +2133,7 @@
       currentFeedLabel = feed ? feed.label : postIdFromUrl(url) ? "动态" : isJikeProfile(url) ? "用户动态" : isJikeTopic(url) ? "话题" : "推荐";
       if (feed && jikeToken()) {
         try {
-          const data = await jikeApi(feed.path, { limit: "20" });
+          const data = await jikeApiPost(feed.path, { limit: 20 });
           const posts = Array.isArray(data.data) ? data.data : [];
           const conversations = posts.map((post) => apiPostToConversation(post, location.href)).filter((conversation) => conversation !== null);
           if (conversations.length) {
@@ -2158,8 +2179,8 @@
         const state = cursor;
         if (state.kind === "feed" && state.path && jikeToken()) {
           try {
-            const data = await jikeApi(state.path, {
-              limit: "20",
+            const data = await jikeApiPost(state.path, {
+              limit: 20,
               loadMoreKey: state.loadMoreKey
             });
             const posts = Array.isArray(data.data) ? data.data : [];
@@ -2183,9 +2204,9 @@
     },
     async searchConversations(query, cursor) {
       const state = cursor && typeof cursor === "object" && "kind" in cursor ? cursor : null;
-      const data = await jikeApi(SEARCH_API, {
+      const data = await jikeApiPost(SEARCH_API, {
         keywords: query,
-        limit: "20",
+        limit: 20,
         loadMoreKey: state?.kind === "search" ? state.loadMoreKey : void 0
       });
       const seen = /* @__PURE__ */ new Set();

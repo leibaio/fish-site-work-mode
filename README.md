@@ -263,9 +263,9 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 
 | 用途 | 路线 |
 | --- | --- |
-| 推荐流 | `GET https://api.ruguoapp.com/1.0/recommendFeed/list?limit=20&loadMoreKey=...` |
-| 关注流 | `GET https://api.ruguoapp.com/1.0/personalUpdate/followingUpdates?limit=20&loadMoreKey=...` |
-| 搜索 | `GET https://api.ruguoapp.com/1.0/search/integrate?keywords=<关键词>&limit=20&loadMoreKey=...` |
+| 推荐流 | `POST https://api.ruguoapp.com/1.0/recommendFeed/list`，body：`{limit, loadMoreKey}` |
+| 关注流 | `POST https://api.ruguoapp.com/1.0/personalUpdate/followingUpdates`，body：`{limit, loadMoreKey}` |
+| 搜索 | `POST https://api.ruguoapp.com/1.0/search/integrate`，body：`{keywords, limit, loadMoreKey}` |
 | 用户/话题/动态详情 | 当前页面 live DOM |
 | API 不可用 | 回退到页面 DOM + 滚动加载 |
 
@@ -274,7 +274,7 @@ API 请求使用页面自己已经存在的登录态：
 - `localStorage.JK_ACCESS_TOKEN`
 - `localStorage.JK_DEVICE_ID`
 
-请求头只加 `x-jike-access-token`、`x-jike-device-id`、`platform: web`，只做 GET 读取，不写数据、不伪造签名。
+请求头只加 `x-jike-access-token`、`x-jike-device-id`、`platform: web`，只做只读请求，不写数据、不伪造签名。
 
 首页 `/` 和 `/explore` 默认是推荐流，`/following` 是关注流；左栏底部可以「加载更多」，顶部搜索框使用即刻搜索接口。
 
