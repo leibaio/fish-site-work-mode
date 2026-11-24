@@ -48,6 +48,11 @@ const sites = {
     ],
     description: "把豆瓣小组变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。",
   },
+  jike: {
+    name: "工作台 · 即刻",
+    matches: ["https://web.okjike.com/*"],
+    description: "把即刻变成工作台：左栏动态、中间阅读区、右侧运行日志，支持工作目录伪装。",
+  },
 };
 
 const meta = sites[site];

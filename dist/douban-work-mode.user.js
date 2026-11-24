@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         工作台 · 豆瓣
 // @namespace    fish-site-work-mode
-// @version      0.7.0
+// @version      0.8.0
 // @description  把豆瓣小组变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT
@@ -239,7 +239,11 @@
 .fs-post-body hr { border: 0; border-top: 1px solid #eee; margin: 1.2em 0; }
 .fs-post-body figure { margin: 1em 0; }
 .fs-post-body figcaption { margin-top: 6px; color: #999; font-size: 12px; text-align: center; }
-.fs-post-body img { max-width: 100%; height: auto; border-radius: 4px; }
+.fs-post-body img {
+  max-width: min(100%, 360px); max-height: 280px; width: auto; height: auto;
+  object-fit: contain; border-radius: 4px; cursor: zoom-in; background: #f7f7f7;
+  vertical-align: middle; margin: 3px 0;
+}
 .fs-post-body video { max-width: 100%; height: auto; border-radius: 4px; }
 .fs-post-body pre {
   margin: 1em 0; padding: 12px; overflow: auto; border-radius: 6px; background: #f6f8fa;
@@ -345,6 +349,24 @@
 .fs-app.fs-logs-only .fs-main,
 .fs-app.fs-logs-only .fs-log-resizer { display: none; }
 .fs-app.fs-logs-only .fs-logpane { flex: 1 1 auto; width: auto !important; }
+
+/* ---------- 图片灯箱 ---------- */
+.fs-lightbox {
+  position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.82); pointer-events: auto; cursor: zoom-out;
+}
+.fs-lightbox[hidden] { display: none; }
+.fs-lightbox-img {
+  max-width: 92vw; max-height: 92vh; object-fit: contain; border-radius: 4px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45); cursor: zoom-out;
+}
+.fs-lightbox-close {
+  position: absolute; top: 16px; right: 20px; width: 34px; height: 34px; border: 0;
+  border-radius: 50%; background: rgba(255,255,255,.16); color: #fff; font-size: 22px;
+  line-height: 34px; cursor: pointer;
+}
+.fs-lightbox-close:hover { background: rgba(255,255,255,.28); }
+.fs-app.fs-lightbox-open .fs-content { overflow: hidden; }
 
 /* ---------- 悬浮球 / toast ---------- */
 .fs-ball {
@@ -570,6 +592,10 @@
         <div class="fs-logbody" id="fs-logbody"></div>
       </aside>
     </div>
+    <div class="fs-lightbox" id="fs-lightbox" hidden>
+      <button class="fs-lightbox-close" id="fs-lightbox-close" type="button" title="关闭">×</button>
+      <img class="fs-lightbox-img" id="fs-lightbox-img" alt="">
+    </div>
     <div class="fs-ball" id="fs-ball" hidden>鱼</div>
     <div class="fs-toast" id="fs-toast"></div>
   `;
@@ -598,6 +624,9 @@
     const logStatus = must("#fs-log-status");
     const ball = must("#fs-ball");
     const toastEl = must("#fs-toast");
+    const lightbox = must("#fs-lightbox");
+    const lightboxImg = must("#fs-lightbox-img");
+    const lightboxClose = must("#fs-lightbox-close");
     let originalTitle = document.title;
     let originalFavicons = [];
     let createdFavicon = null;
@@ -611,6 +640,48 @@
       window.clearTimeout(toastTimer);
       toastTimer = window.setTimeout(() => toastEl.classList.remove("show"), 2200);
     }
+    function zoomSource(image) {
+      const explicit = image.getAttribute("data-zoom-src");
+      if (explicit) return explicit;
+      const source = image.currentSrc || image.src;
+      if (!source) return "";
+      if (/sinaimg\.cn/i.test(source)) {
+        return source.replace(/\/(orj360|thumb150|thumbnail)\//i, "/large/");
+      }
+      if (/zhimg\.com/i.test(source)) {
+        return source.replace(/_b(\.[a-z0-9]+)(\?|$)/i, "_r$1$2");
+      }
+      if (/doubanio\.com/i.test(source)) {
+        return source.replace(/\/small\//i, "/large/");
+      }
+      return source;
+    }
+    function openLightbox(image) {
+      const original = image.currentSrc || image.src;
+      const zoom = zoomSource(image) || original;
+      if (!zoom) return;
+      lightboxImg.dataset.original = original;
+      lightboxImg.src = zoom;
+      lightboxImg.alt = image.alt || "";
+      lightbox.hidden = false;
+      app.classList.add("fs-lightbox-open");
+    }
+    function closeLightbox() {
+      if (lightbox.hidden) return;
+      lightbox.hidden = true;
+      lightboxImg.removeAttribute("src");
+      lightboxImg.removeAttribute("data-original");
+      app.classList.remove("fs-lightbox-open");
+    }
+    lightboxImg.addEventListener("error", () => {
+      const original = lightboxImg.dataset.original || "";
+      if (original && lightboxImg.src !== original) lightboxImg.src = original;
+    });
+    lightbox.addEventListener("click", (event) => {
+      if (event.target === lightbox || event.target === lightboxImg || event.target === lightboxClose) {
+        closeLightbox();
+      }
+    });
     function appendLog(entry) {
       const line = document.createElement("div");
       line.className = "fs-logline";
@@ -841,6 +912,7 @@
     }
     async function openConversation(id) {
       if (!id) return;
+      closeLightbox();
       const token = ++state.openToken;
       state.currentId = id;
       renderSidebar();
@@ -959,6 +1031,7 @@
     function exitMode() {
       state.enabled = false;
       store.set("enabled", false);
+      closeLightbox();
       stopLogFeed();
       setSiteHidden(false);
       app.style.display = "none";
@@ -1022,6 +1095,11 @@
       });
     }
     function onKeydown(event) {
+      if (event.key === "Escape" && !lightbox.hidden) {
+        event.preventDefault();
+        closeLightbox();
+        return;
+      }
       if (!event.ctrlKey || !event.altKey || event.shiftKey || event.repeat) return;
       const key = String(event.key || "").toLowerCase();
       if (key !== "q" && event.code !== "KeyQ") return;
@@ -1034,6 +1112,18 @@
     }
     function onContentClick(event) {
       const target = event.target;
+      const image = target?.closest?.("img");
+      if (image && image.closest(".fs-post-body")) {
+        const rect = image.getBoundingClientRect();
+        const width = rect.width || image.naturalWidth || image.width;
+        const height = rect.height || image.naturalHeight || image.height;
+        if (width >= 48 && height >= 48) {
+          event.preventDefault();
+          event.stopPropagation();
+          openLightbox(image);
+          return;
+        }
+      }
       const anchor = target?.closest?.("a") ?? null;
       if (!anchor) return;
       const href = anchor.getAttribute("href");

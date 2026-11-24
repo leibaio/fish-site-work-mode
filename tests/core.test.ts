@@ -179,4 +179,30 @@ describe("core shell", () => {
       [...shadow.querySelectorAll(".fs-item-title")].map((element) => element.textContent),
     ).toContain("Topic Two");
   });
+
+  it("opens and closes the image lightbox", async () => {
+    const adapter = mockAdapter();
+    adapter.openConversation = async () => ({
+      title: "Topic",
+      html:
+        '<section class="fs-post"><div class="fs-post-body">' +
+        '<img src="https://example.com/a.jpg" width="400" height="300" alt="A">' +
+        "</div></section>",
+      hasMore: false,
+    });
+
+    handle = await startApp(adapter, coverStory);
+    const shadow = handle!.shadow;
+    await waitFor(() => !!shadow.querySelector(".fs-post-body img"));
+
+    const image = shadow.querySelector(".fs-post-body img") as HTMLImageElement;
+    image.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect((shadow.querySelector("#fs-lightbox") as HTMLElement).hidden).toBe(false);
+    expect(
+      (shadow.querySelector("#fs-lightbox-img") as HTMLImageElement).getAttribute("src"),
+    ).toBe("https://example.com/a.jpg");
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect((shadow.querySelector("#fs-lightbox") as HTMLElement).hidden).toBe(true);
+  });
 });

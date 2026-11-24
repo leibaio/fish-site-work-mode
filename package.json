@@ -1,6 +1,6 @@
 {
   "name": "fish-site-work-mode",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "description": "多站点工作台：左栏会话/工作目录、中间阅读区、右侧运行日志",
@@ -25,7 +25,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "node packages/build/build.mjs linuxdo && node packages/build/build.mjs v2ex && node packages/build/build.mjs chiphell && node packages/build/build.mjs hupu && node packages/build/build.mjs zhihu && node packages/build/build.mjs weibo && node packages/build/build.mjs douban",
+    "build": "node packages/build/build.mjs linuxdo && node packages/build/build.mjs v2ex && node packages/build/build.mjs chiphell && node packages/build/build.mjs hupu && node packages/build/build.mjs zhihu && node packages/build/build.mjs weibo && node packages/build/build.mjs douban && node packages/build/build.mjs jike",
     "build:linuxdo": "node packages/build/build.mjs linuxdo",
     "build:v2ex": "node packages/build/build.mjs v2ex",
     "build:chiphell": "node packages/build/build.mjs chiphell",
@@ -33,6 +33,7 @@
     "build:zhihu": "node packages/build/build.mjs zhihu",
     "build:weibo": "node packages/build/build.mjs weibo",
     "build:douban": "node packages/build/build.mjs douban",
+    "build:jike": "node packages/build/build.mjs jike",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

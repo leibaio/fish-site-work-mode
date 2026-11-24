@@ -117,7 +117,11 @@ export const STYLES = `
 .fs-post-body hr { border: 0; border-top: 1px solid #eee; margin: 1.2em 0; }
 .fs-post-body figure { margin: 1em 0; }
 .fs-post-body figcaption { margin-top: 6px; color: #999; font-size: 12px; text-align: center; }
-.fs-post-body img { max-width: 100%; height: auto; border-radius: 4px; }
+.fs-post-body img {
+  max-width: min(100%, 360px); max-height: 280px; width: auto; height: auto;
+  object-fit: contain; border-radius: 4px; cursor: zoom-in; background: #f7f7f7;
+  vertical-align: middle; margin: 3px 0;
+}
 .fs-post-body video { max-width: 100%; height: auto; border-radius: 4px; }
 .fs-post-body pre {
   margin: 1em 0; padding: 12px; overflow: auto; border-radius: 6px; background: #f6f8fa;
@@ -223,6 +227,24 @@ export const STYLES = `
 .fs-app.fs-logs-only .fs-main,
 .fs-app.fs-logs-only .fs-log-resizer { display: none; }
 .fs-app.fs-logs-only .fs-logpane { flex: 1 1 auto; width: auto !important; }
+
+/* ---------- 图片灯箱 ---------- */
+.fs-lightbox {
+  position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.82); pointer-events: auto; cursor: zoom-out;
+}
+.fs-lightbox[hidden] { display: none; }
+.fs-lightbox-img {
+  max-width: 92vw; max-height: 92vh; object-fit: contain; border-radius: 4px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.45); cursor: zoom-out;
+}
+.fs-lightbox-close {
+  position: absolute; top: 16px; right: 20px; width: 34px; height: 34px; border: 0;
+  border-radius: 50%; background: rgba(255,255,255,.16); color: #fff; font-size: 22px;
+  line-height: 34px; cursor: pointer;
+}
+.fs-lightbox-close:hover { background: rgba(255,255,255,.28); }
+.fs-app.fs-lightbox-open .fs-content { overflow: hidden; }
 
 /* ---------- 悬浮球 / toast ---------- */
 .fs-ball {

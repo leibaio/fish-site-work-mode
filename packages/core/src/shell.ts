@@ -214,6 +214,10 @@ export async function startApp(
         <div class="fs-logbody" id="fs-logbody"></div>
       </aside>
     </div>
+    <div class="fs-lightbox" id="fs-lightbox" hidden>
+      <button class="fs-lightbox-close" id="fs-lightbox-close" type="button" title="关闭">×</button>
+      <img class="fs-lightbox-img" id="fs-lightbox-img" alt="">
+    </div>
     <div class="fs-ball" id="fs-ball" hidden>鱼</div>
     <div class="fs-toast" id="fs-toast"></div>
   `;
@@ -244,6 +248,9 @@ export async function startApp(
   const logStatus = must<HTMLElement>("#fs-log-status");
   const ball = must<HTMLElement>("#fs-ball");
   const toastEl = must<HTMLElement>("#fs-toast");
+  const lightbox = must<HTMLElement>("#fs-lightbox");
+  const lightboxImg = must<HTMLImageElement>("#fs-lightbox-img");
+  const lightboxClose = must<HTMLButtonElement>("#fs-lightbox-close");
 
   let originalTitle = document.title;
   let originalFavicons: Array<{ el: HTMLLinkElement; href: string | null }> = [];
@@ -261,6 +268,53 @@ export async function startApp(
     window.clearTimeout(toastTimer);
     toastTimer = window.setTimeout(() => toastEl.classList.remove("show"), 2200);
   }
+
+  function zoomSource(image: HTMLImageElement): string {
+    const explicit = image.getAttribute("data-zoom-src");
+    if (explicit) return explicit;
+
+    const source = image.currentSrc || image.src;
+    if (!source) return "";
+    if (/sinaimg\.cn/i.test(source)) {
+      return source.replace(/\/(orj360|thumb150|thumbnail)\//i, "/large/");
+    }
+    if (/zhimg\.com/i.test(source)) {
+      return source.replace(/_b(\.[a-z0-9]+)(\?|$)/i, "_r$1$2");
+    }
+    if (/doubanio\.com/i.test(source)) {
+      return source.replace(/\/small\//i, "/large/");
+    }
+    return source;
+  }
+
+  function openLightbox(image: HTMLImageElement): void {
+    const original = image.currentSrc || image.src;
+    const zoom = zoomSource(image) || original;
+    if (!zoom) return;
+    lightboxImg.dataset.original = original;
+    lightboxImg.src = zoom;
+    lightboxImg.alt = image.alt || "";
+    lightbox.hidden = false;
+    app.classList.add("fs-lightbox-open");
+  }
+
+  function closeLightbox(): void {
+    if (lightbox.hidden) return;
+    lightbox.hidden = true;
+    lightboxImg.removeAttribute("src");
+    lightboxImg.removeAttribute("data-original");
+    app.classList.remove("fs-lightbox-open");
+  }
+
+  lightboxImg.addEventListener("error", () => {
+    const original = lightboxImg.dataset.original || "";
+    if (original && lightboxImg.src !== original) lightboxImg.src = original;
+  });
+  lightbox.addEventListener("click", (event) => {
+    if (event.target === lightbox || event.target === lightboxImg || event.target === lightboxClose) {
+      closeLightbox();
+    }
+  });
 
   function appendLog(entry: LogEntry): void {
     const line = document.createElement("div");
@@ -554,6 +608,7 @@ export async function startApp(
 
   async function openConversation(id: string): Promise<void> {
     if (!id) return;
+    closeLightbox();
     const token = ++state.openToken;
     state.currentId = id;
     renderSidebar();
@@ -682,6 +737,7 @@ export async function startApp(
   function exitMode(): void {
     state.enabled = false;
     store.set("enabled", false);
+    closeLightbox();
     stopLogFeed();
     setSiteHidden(false);
     app.style.display = "none";
@@ -757,6 +813,11 @@ export async function startApp(
   }
 
   function onKeydown(event: KeyboardEvent): void {
+    if (event.key === "Escape" && !lightbox.hidden) {
+      event.preventDefault();
+      closeLightbox();
+      return;
+    }
     if (!event.ctrlKey || !event.altKey || event.shiftKey || event.repeat) return;
     const key = String(event.key || "").toLowerCase();
     if (key !== "q" && event.code !== "KeyQ") return;
@@ -770,6 +831,19 @@ export async function startApp(
 
   function onContentClick(event: MouseEvent): void {
     const target = event.target as Element | null;
+    const image = target?.closest?.("img") as HTMLImageElement | null;
+    if (image && image.closest(".fs-post-body")) {
+      const rect = image.getBoundingClientRect();
+      const width = rect.width || image.naturalWidth || image.width;
+      const height = rect.height || image.naturalHeight || image.height;
+      if (width >= 48 && height >= 48) {
+        event.preventDefault();
+        event.stopPropagation();
+        openLightbox(image);
+        return;
+      }
+    }
+
     const anchor = target?.closest?.("a") ?? null;
     if (!anchor) return;
     const href = anchor.getAttribute("href");

@@ -375,6 +375,7 @@ main ▾ · 3 changes
 | **虎扑** | 版块主题列表 | 帖子楼层 | HTML/DOM + 分页 | 中高 | 反爬、移动/桌面差异 |
 | **微博** | 关注/推荐时间线 | 微博正文 + 评论 | 页面 DOM + 页面自己的 XHR（XSRF） | 高 | 登录、限频、动态渲染 |
 | **豆瓣小组** | 讨论精选 / 话题 | 楼主 + 回复楼层 | live DOM + 同源 fetch 回退 | 中 | 登录、反爬、403 |
+| **即刻** | 动态流 / 用户 / 话题 | 动态正文 + 图片/视频 | live DOM | 中高 | 纯 CSR、登录、鉴权 |
 
 ### 8.1 每个站点的共同适配步骤
 
@@ -499,7 +500,8 @@ wm:global:loglevel
 5. **Chiphell** 与 **虎扑** 已按 HTML + 分页完成。
 6. **知乎 / 微博** 已按 live DOM + 页面自有内容完成，不碰签名。
 7. **豆瓣小组** 已按 live DOM + 同源 fetch 回退完成。
-8. 小红书：直接参考 `xhs-wechat-mode` 的 feed DOM + 隐藏 iframe。
+8. **即刻** 已按 live DOM 完成。
+9. 小红书：直接参考 `xhs-wechat-mode` 的 feed DOM + 隐藏 iframe。
 
 ---
 

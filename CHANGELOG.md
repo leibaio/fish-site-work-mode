@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.8.0 — 2026-11-24
+
+新增即刻适配器，并统一优化正文图片。
+
+### 新增
+
+- 即刻（web.okjike.com）live DOM 适配器：
+  - 首页 `/`、`/following`、`/explore`
+  - 用户页 `/u/<username>`、话题页 `/topic/<id>`
+  - 动态详情 `/originalPost/<id>`、`/originalPosts/<id>`、`/u/<username>/post/<id>`
+  - 读取动态作者、头像、时间、正文、图片、视频
+  - 不伪造即刻的鉴权/签名
+- 即刻工作伪装：`product-service`、TypeScript 文件树、`product-notes.pdf`
+- 正文图片默认缩小到最大 360 × 280，点击打开灯箱放大
+- 灯箱支持 `Esc`、点击空白处、右上角关闭；切换会话/退出时自动关闭
+- 微博 `orj360`、知乎 `_b`、豆瓣 `/small/` 缩略图会尝试替换为大图，失败自动回退
+- 小图标 / emoji 不触发灯箱
+- 新增即刻适配器测试、图片灯箱测试，测试总数 44
+
 ## 0.7.0 — 2026-11-24
 
 优化 linux.do 左栏话题数量。
