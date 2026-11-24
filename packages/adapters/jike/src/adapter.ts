@@ -21,6 +21,7 @@ import {
 } from "../../../core/src/index";
 
 const CARD_SELECTORS = [
+  '[class*="_post_"]',
   '[class*="_postCard_"]',
   '[class*="_postItem_"]',
   "article",
@@ -127,6 +128,9 @@ function firstNonEmpty(root: Element, selectors: string[]): string {
 }
 
 function postIdOf(card: Element): string {
+  const direct = card.getAttribute("data-post-id") || card.id;
+  if (direct && /^[A-Za-z0-9]+$/.test(direct)) return direct;
+
   for (const link of card.querySelectorAll("a[href]")) {
     const href = link.getAttribute("href") || "";
     const match =
@@ -176,8 +180,33 @@ function findAvatar(card: Element, baseUrl: string): string {
   );
 }
 
+function timeAnchoredCards(doc: Document): Element[] {
+  const cards = new Set<Element>();
+  doc.querySelectorAll("time").forEach((time) => {
+    let node: Element | null = time.parentElement;
+    for (let depth = 0; depth < 8 && node; depth++, node = node.parentElement) {
+      const text = normalizeText(node.textContent);
+      if (text.length > 5000) break;
+      if (
+        text.length >= 20 &&
+        node.querySelector('a[href^="/u/"]') &&
+        node.querySelector("img")
+      ) {
+        cards.add(node);
+        break;
+      }
+    }
+  });
+  return topLevel([...cards]);
+}
+
 function cardCandidates(doc: Document): Element[] {
   let cards = topLevel(queryAll(doc, CARD_SELECTORS)).filter(
+    (element) => normalizeText(element.textContent).length >= 8,
+  );
+  if (cards.length) return cards;
+
+  cards = timeAnchoredCards(doc).filter(
     (element) => normalizeText(element.textContent).length >= 8,
   );
   if (cards.length) return cards;
@@ -401,7 +430,15 @@ export const jikeAdapter: SiteAdapter = {
     const parsed = parseJikeList(document, location.href, postId || undefined);
     cardElements = parsed.elements;
     if (parsed.conversations.length) return parsed.conversations;
-    throw new Error("未找到即刻内容（请确认已登录，且页面已加载）");
+    console.info("[工作台][即刻] 未找到动态卡片", {
+      post: document.querySelectorAll('[class*="_post_"]').length,
+      postCard: document.querySelectorAll('[class*="_postCard_"]').length,
+      postItem: document.querySelectorAll('[class*="_postItem_"]').length,
+      time: document.querySelectorAll("time").length,
+      userLinks: document.querySelectorAll('a[href^="/u/"]').length,
+      href: location.href,
+    });
+    throw new Error("未找到即刻内容（可能需要登录；控制台已输出页面结构计数）");
   },
 
   async openConversation(id: string): Promise<ContentView> {

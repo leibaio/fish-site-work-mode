@@ -12,7 +12,7 @@ function parse(html: string): Document {
 }
 
 const feedHtml = `<!doctype html><html><body>
-  <div class="_postCard_abc">
+  <div class="_post_abc">
     <a href="/u/alice"><img class="jk-avatar _avatar_x" src="https://cdnv2.ruguoapp.com/a.jpg"></a>
     <a class="_screenName_x" href="/u/alice">Alice</a>
     <time datetime="2026-11-24T10:00:00.000Z">11-24</time>
@@ -48,7 +48,7 @@ describe("Jike adapter", () => {
     expect(parsed.conversations[0].avatar).toBe("https://cdnv2.ruguoapp.com/a.jpg");
     expect(parsed.conversations[0].updatedAt).toBe(Date.parse("2026-11-24T10:00:00.000Z"));
     expect(parsed.conversations[1].id).toBe("post:def456");
-    expect(parsed.elements.get("post:abc123")?.classList.contains("_postCard_abc")).toBe(true);
+    expect(parsed.elements.get("post:abc123")?.classList.contains("_post_abc")).toBe(true);
   });
 
   it("builds a post view with sanitized content and image", () => {
@@ -72,5 +72,19 @@ describe("Jike adapter", () => {
     </div>`);
     const parsed = parseJikeList(doc, "https://web.okjike.com/originalPost/xyz789", "xyz789");
     expect(parsed.conversations[0].id).toBe("post:xyz789");
+  });
+
+  it("falls back to time-anchored cards when class names change", () => {
+    const doc = parse(`<div class="unknown-card">
+      <a href="/u/carol"><img src="https://cdnv2.ruguoapp.com/c.jpg"></a>
+      <a href="/u/carol">Carol</a>
+      <time datetime="2026-11-24T08:00:00.000Z">11-24</time>
+      <div class="body">这是一条没有预期 class 的即刻正文</div>
+    </div>`);
+    const parsed = parseJikeList(doc, "https://web.okjike.com/");
+
+    expect(parsed.conversations).toHaveLength(1);
+    expect(parsed.conversations[0].title).toBe("Carol");
+    expect(parsed.conversations[0].subtitle).toContain("没有预期");
   });
 });
