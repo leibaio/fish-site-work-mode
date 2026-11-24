@@ -244,4 +244,31 @@ describe("core shell", () => {
     );
     expect((shadow.querySelector("#fs-search-input") as HTMLInputElement).value).toBe("");
   });
+
+  it("thumbnails and enlarges inline svg content", async () => {
+    const adapter = mockAdapter();
+    adapter.openConversation = async () => ({
+      title: "SVG",
+      html:
+        '<section class="fs-post"><div class="fs-post-body">' +
+        '<svg width="200" height="120"><rect width="200" height="120"></rect></svg>' +
+        "</div></section>",
+      hasMore: false,
+    });
+
+    handle = await startApp(adapter, coverStory);
+    const shadow = handle!.shadow;
+    await waitFor(() => !!shadow.querySelector(".fs-post-body svg"));
+
+    const svg = shadow.querySelector(".fs-post-body svg") as SVGSVGElement;
+    expect(svg.classList.contains("fs-thumb-svg")).toBe(true);
+    svg.querySelector("rect")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect((shadow.querySelector("#fs-lightbox") as HTMLElement).hidden).toBe(false);
+    expect((shadow.querySelector("#fs-lightbox-svg") as HTMLElement).hidden).toBe(false);
+    expect((shadow.querySelector("#fs-lightbox-img") as HTMLElement).hidden).toBe(true);
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect((shadow.querySelector("#fs-lightbox") as HTMLElement).hidden).toBe(true);
+  });
 });

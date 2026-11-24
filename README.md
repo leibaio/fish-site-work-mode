@@ -30,16 +30,16 @@
 
 - 三栏：最近话题 / 阅读区 / 运行日志
 - 左栏和日志栏宽度都可以鼠标拖动调节，宽度会记在本地
-- linux.do 左栏默认加载最新前两页（约 60 条），底部「加载更多话题」继续翻页
+- linux.do 左栏默认加载最新前两页（约 60 条），底部「加载更多」继续翻页
 - 点击顶栏标题、`日志` 按钮，或按 `Ctrl+Alt+Q`，在「阅读区」和「只看日志」之间切换
 - 窗口宽度小于 1000px 时不接管页面
 - 右上角 `⏏` 退出后，右下角保留一个悬浮球，点击恢复
 
 ### 搜索
 
-- linux.do 左栏支持搜索：输入关键词后按回车或点「搜」
+- linux.do / 即刻左栏支持搜索：输入关键词后按回车或点「搜」
 - 搜索结果可以直接打开；结果较多时底部可「加载更多结果」
-- 点 `×` 清除搜索，恢复原来的最近话题列表
+- 点 `×` 清除搜索，恢复原来的列表
 - 工作目录模式下会隐藏搜索框，避免在伪装界面里暴露关键词
 
 ### 工作伪装
@@ -62,12 +62,13 @@
 - 虎扑按帖子分页加载后续楼层，每页约 20 回复
 - **知乎 / 微博使用 live DOM 模式**：只读取当前页面已经渲染出来的回答、推荐卡片或微博，不伪造签名、不请求未授权的跨页数据
 - **豆瓣小组**：`/group/` 读取讨论精选卡片；`/group/topic/<id>/` 读取楼主 + 回复楼层；从精选页打开话题时会先尝试同源 fetch，失败则跳转到话题页由 live DOM 接管
-- **即刻**：`web.okjike.com` 首页/关注/探索、用户页、话题页读取当前已渲染的动态卡片；动态详情页优先打开当前动态
+- **即刻**：首页/探索使用推荐流 API，`/following` 使用关注流 API；用户页、话题页、动态详情页使用 live DOM；左栏支持加载更多和搜索
 - 站内链接默认新标签打开，不打断当前阅读
 
 ### 图片
 
 - 正文图片默认显示 **88 × 60** 的小缩略图（`object-fit: cover`），尽量不显眼
+- 内联 SVG 也按同样尺寸缩略，点击后在灯箱里矢量放大
 - emoji、小图标、头像不会套用缩略图样式
 - 点击图片打开灯箱放大，支持 `Esc`、点击空白处或右上角关闭
 - 微博 `orj360`、知乎 `_b`、豆瓣 `/small/` 等缩略图会尝试换成大图；换图失败会自动回退原图
@@ -164,7 +165,7 @@ packages/
     douban/             # 豆瓣小组适配器
       src/adapter.ts    # 讨论精选、话题楼主/回复、同源 fetch + 导航回退
       src/index.ts      # 入口：startApp(doubanAdapter, doubanCoverStory)
-    jike/               # 即刻（live DOM）适配器
+    jike/               # 即刻（API + live DOM）适配器
       src/adapter.ts    # 动态流、详情、用户/话题页
       src/index.ts      # 入口：startApp(jikeAdapter, jikeCoverStory)
   build/
@@ -258,16 +259,26 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 
 ### 即刻
 
-即刻 Web 是纯客户端渲染，脚本使用 live DOM 读取当前页面：
+即刻 Web 是客户端渲染，适配器组合了「页面自己的登录态 API」和 live DOM：
 
-- 首页 `/`、`/following`、`/explore`
-- 用户页 `/u/<username>`
-- 话题页 `/topic/<id>`
-- 动态详情 `/originalPost/<id>`、`/originalPosts/<id>`、`/u/<username>/post/<id>`
+| 用途 | 路线 |
+| --- | --- |
+| 推荐流 | `GET https://api.ruguoapp.com/1.0/recommendFeed/list?limit=20&loadMoreKey=...` |
+| 关注流 | `GET https://api.ruguoapp.com/1.0/personalUpdate/followingUpdates?limit=20&loadMoreKey=...` |
+| 搜索 | `GET https://api.ruguoapp.com/1.0/search/integrate?keywords=<关键词>&limit=20&loadMoreKey=...` |
+| 用户/话题/动态详情 | 当前页面 live DOM |
+| API 不可用 | 回退到页面 DOM + 滚动加载 |
 
-不伪造即刻的签名/鉴权，只读取已经渲染出来的动态卡片、正文、图片和视频；未登录或内容未加载时会显示加载失败。
+API 请求使用页面自己已经存在的登录态：
 
-如果接口因未登录、权限、Cloudflare 验证、限频等原因失败，阅读区会显示错误提示，不会静默吞掉，也不会绕过站点权限。
+- `localStorage.JK_ACCESS_TOKEN`
+- `localStorage.JK_DEVICE_ID`
+
+请求头只加 `x-jike-access-token`、`x-jike-device-id`、`platform: web`，只做 GET 读取，不写数据、不伪造签名。
+
+首页 `/` 和 `/explore` 默认是推荐流，`/following` 是关注流；左栏底部可以「加载更多」，顶部搜索框使用即刻搜索接口。
+
+如果接口因未登录、权限、CORS、限频等原因失败，会回退到 live DOM；搜索失败时会显示错误提示，不会绕过权限。
 
 ---
 
@@ -298,7 +309,7 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 | 知乎 | ✅ 可用（live DOM） | 问题回答 / 首页推荐，只读当前页面已渲染内容 |
 | 微博 | ✅ 可用（live DOM） | 时间线 / 状态详情，只读当前页面已渲染内容 |
 | 豆瓣小组 | ✅ 可用（live DOM） | 讨论精选 / 话题楼主+回复；话题页优先 live DOM |
-| 即刻 | ✅ 可用（live DOM） | 动态流 / 详情 / 用户 / 话题，只读当前页面已渲染内容 |
+| 即刻 | ✅ 可用（API + live DOM） | 推荐/关注流 API、搜索、加载更多；详情回退 DOM |
 | 小红书 | 计划 | 需要处理签名接口，优先 DOM + 隐藏详情页路线 |
 
 ---
@@ -306,7 +317,7 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 ## 已知限制
 
 - linux.do / V2EX / Chiphell / 虎扑都是**只读**的：可以浏览、翻页、切换话题，但不能发帖、回复、点赞、收藏
-- linux.do 左栏默认加载最新前两页，底部可以继续「加载更多话题」；搜索目前只在 linux.do 提供，其他站点后续可复用 `searchConversations` 接口
+- linux.do 左栏默认加载最新前两页，底部可以继续「加载更多」；搜索目前只在 linux.do、即刻提供，其他站点后续可复用 `searchConversations` 接口
 - V2EX 节点页通过 API 拉取该节点最新 10 条，暂未做翻页
 - 正文图片默认显示 88 × 60 缩略图，点击灯箱看原图；不适合用极小图阅读的场景可以用灯箱
 - V2EX 的回复由公开 API 一次性返回；超长主题如果被服务端截断，工作台不会自动补页
@@ -316,7 +327,8 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 - 知乎文章（`zhuanlan.zhihu.com`）和微博移动版（`m.weibo.cn`）暂未接入，目前分别支持问答/推荐页和 `weibo.com` 时间线
 - 豆瓣目前支持 `/group/` 讨论精选和 `/group/topic/<id>/` 话题页；具体小组页 `/group/<gid>/`、电影/图书/音乐条目页暂未接管
 - 豆瓣从精选页打开话题时，如果同源 fetch 被 403/登录墙拦截，会跳转到话题页，由 live DOM 重新接管
-- 即刻是 live DOM：只读当前页面已渲染的动态，翻页/无限滚动不会接管；即刻的 API 需要鉴权，脚本不伪造签名
+- 即刻首页/探索使用推荐 API，`/following` 使用关注 API；搜索走即刻搜索接口。API 失效时回退 live DOM + 滚动加载
+- 即刻 API 只使用页面已有的登录 token 做只读 GET；如果 token 过期或 CORS 失败，会回退 DOM 或显示错误
 - Chiphell / 虎扑部分版块或附件需要登录才能查看，权限不足时会显示加载失败
 - 伪装只覆盖前端，不改变浏览器历史记录里的真实 URL
 - 站点改版、接口限频或反爬策略变化后，对应适配器可能需要同步调整
@@ -340,8 +352,8 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 # 1. 修改 package.json 的 version，并更新 CHANGELOG.md
 npm run check
 git add dist package.json CHANGELOG.md
-git commit -m "chore: release v0.9.1"
-git tag v0.9.1
+git commit -m "chore: release v0.9.2"
+git tag v0.9.2
 git push origin main --tags
 ```
 
@@ -358,7 +370,7 @@ CI 会校验提交的 `dist` 与源码构建结果一致。也可以在 GitHub R
 - [虎扑](https://bbs.hupu.com/)：BBS 社区，第四个适配对象
 - [知乎](https://www.zhihu.com/) / [微博](https://weibo.com/)：live DOM 读取，第五、第六个适配对象
 - [豆瓣小组](https://www.douban.com/group/)：讨论精选 + 话题楼层，第七个适配对象
-- [即刻](https://web.okjike.com/)：动态流 live DOM，第八个适配对象
+- [即刻](https://web.okjike.com/)：推荐/关注 API + live DOM，第八个适配对象
 - 多站点架构与路线设计见 [docs/MODE-BLUEPRINT.md](docs/MODE-BLUEPRINT.md)
 
 ## License

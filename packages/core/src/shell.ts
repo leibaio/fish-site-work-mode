@@ -231,6 +231,7 @@ export async function startApp(
     </div>
     <div class="fs-lightbox" id="fs-lightbox" hidden>
       <button class="fs-lightbox-close" id="fs-lightbox-close" type="button" title="关闭">×</button>
+      <div class="fs-lightbox-svg" id="fs-lightbox-svg" hidden></div>
       <img class="fs-lightbox-img" id="fs-lightbox-img" alt="">
     </div>
     <div class="fs-ball" id="fs-ball" hidden>鱼</div>
@@ -269,6 +270,7 @@ export async function startApp(
   const toastEl = must<HTMLElement>("#fs-toast");
   const lightbox = must<HTMLElement>("#fs-lightbox");
   const lightboxImg = must<HTMLImageElement>("#fs-lightbox-img");
+  const lightboxSvg = must<HTMLElement>("#fs-lightbox-svg");
   const lightboxClose = must<HTMLButtonElement>("#fs-lightbox-close");
 
   let originalTitle = document.title;
@@ -311,6 +313,9 @@ export async function startApp(
     const original = image.currentSrc || image.src;
     const zoom = zoomSource(image) || original;
     if (!zoom) return;
+    lightboxSvg.hidden = true;
+    lightboxSvg.innerHTML = "";
+    lightboxImg.hidden = false;
     lightboxImg.dataset.original = original;
     lightboxImg.src = zoom;
     lightboxImg.alt = image.alt || "";
@@ -318,11 +323,27 @@ export async function startApp(
     app.classList.add("fs-lightbox-open");
   }
 
+  function openSvgLightbox(svg: SVGSVGElement): void {
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    clone.classList.remove("fs-thumb-svg", "fs-inline-svg");
+    clone.removeAttribute("style");
+    lightboxImg.hidden = true;
+    lightboxImg.removeAttribute("src");
+    lightboxSvg.innerHTML = "";
+    lightboxSvg.appendChild(clone);
+    lightboxSvg.hidden = false;
+    lightbox.hidden = false;
+    app.classList.add("fs-lightbox-open");
+  }
+
   function closeLightbox(): void {
     if (lightbox.hidden) return;
     lightbox.hidden = true;
+    lightboxImg.hidden = false;
     lightboxImg.removeAttribute("src");
     lightboxImg.removeAttribute("data-original");
+    lightboxSvg.hidden = true;
+    lightboxSvg.innerHTML = "";
     app.classList.remove("fs-lightbox-open");
   }
 
@@ -331,7 +352,13 @@ export async function startApp(
     if (original && lightboxImg.src !== original) lightboxImg.src = original;
   });
   lightbox.addEventListener("click", (event) => {
-    if (event.target === lightbox || event.target === lightboxImg || event.target === lightboxClose) {
+    const target = event.target as Node;
+    if (
+      target === lightbox ||
+      target === lightboxImg ||
+      target === lightboxClose ||
+      (!lightboxSvg.hidden && lightboxSvg.contains(target))
+    ) {
       closeLightbox();
     }
   });
@@ -452,7 +479,11 @@ export async function startApp(
   function setBrandAndFoot(): void {
     brand.textContent = state.workMode ? "工作目录" : adapter.normalTitle;
     brand.title = state.workMode ? "点击恢复会话列表" : "点击切换工作目录";
-    sideFoot.textContent = state.workMode ? coverStory.footer : "最近会话";
+    sideFoot.textContent = state.workMode
+      ? coverStory.footer
+      : state.searchMode
+        ? "搜索结果"
+        : adapter.listLabel?.() || "最近会话";
   }
 
   function updateSearchUi(): void {
@@ -568,7 +599,7 @@ export async function startApp(
       state.listHasMore && moreAvailable
         ? `<button class="fs-list-more" type="button"${
             state.listLoading ? " disabled" : ""
-          }>${state.listLoading ? "加载中…" : state.searchMode ? "加载更多结果" : "加载更多话题"}</button>`
+          }>${state.listLoading ? "加载中…" : state.searchMode ? "加载更多结果" : "加载更多"}</button>`
         : "";
     list.innerHTML = items + more;
   }
@@ -645,6 +676,26 @@ export async function startApp(
       };
       if (image.complete) markInline();
       else image.addEventListener("load", markInline, { once: true });
+    });
+
+    root.querySelectorAll<SVGSVGElement>(".fs-post-body svg").forEach((svg) => {
+      if (svg.parentElement?.closest("svg")) return;
+      const className = String(svg.getAttribute("class") || "");
+      if (/emoji|icon|avatar/i.test(className)) {
+        svg.classList.add("fs-inline-svg");
+        return;
+      }
+
+      const rect = svg.getBoundingClientRect();
+      const attributeWidth = Number(svg.getAttribute("width") || 0);
+      const attributeHeight = Number(svg.getAttribute("height") || 0);
+      const viewBox = (svg.getAttribute("viewBox") || "")
+        .split(/[\s,]+/)
+        .map(Number);
+      const width = rect.width || attributeWidth || viewBox[2] || 0;
+      const height = rect.height || attributeHeight || viewBox[3] || 0;
+      if (width >= 48 && height >= 48) svg.classList.add("fs-thumb-svg");
+      else svg.classList.add("fs-inline-svg");
     });
   }
 
@@ -1008,6 +1059,13 @@ export async function startApp(
     }
 
     const anchor = target?.closest?.("a") ?? null;
+    const svg = target?.closest?.("svg.fs-thumb-svg") as SVGSVGElement | null;
+    if (svg && svg.closest(".fs-post-body")) {
+      event.preventDefault();
+      event.stopPropagation();
+      openSvgLightbox(svg);
+      return;
+    }
     if (!anchor) return;
     const href = anchor.getAttribute("href");
     if (!href || href.startsWith("#")) return;

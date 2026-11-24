@@ -143,6 +143,16 @@ export const STYLES = `
   background: transparent; border-radius: 2px; cursor: default; margin: 0 1px;
   vertical-align: -0.2em;
 }
+.fs-post-body svg.fs-thumb-svg {
+  width: 88px; height: 60px; max-width: 88px; max-height: 60px; cursor: zoom-in;
+  border: 1px solid #ececec; background: #f4f4f4; border-radius: 4px; padding: 2px;
+  vertical-align: middle; margin: 2px 4px 2px 0;
+}
+.fs-post-body svg.fs-thumb-svg:hover { border-color: #07c160; }
+.fs-post-body svg.fs-inline-svg {
+  width: auto; height: auto; max-width: 100%; max-height: 1.6em; border: 0;
+  background: transparent; vertical-align: -0.2em;
+}
 .fs-post-body video { max-width: 100%; height: auto; border-radius: 4px; }
 .fs-post-body pre {
   margin: 1em 0; padding: 12px; overflow: auto; border-radius: 6px; background: #f6f8fa;
@@ -255,6 +265,15 @@ export const STYLES = `
   background: rgba(0,0,0,.82); pointer-events: auto; cursor: zoom-out;
 }
 .fs-lightbox[hidden] { display: none; }
+.fs-lightbox-img[hidden] { display: none; }
+.fs-lightbox-svg {
+  max-width: 92vw; max-height: 92vh; display: flex; align-items: center; justify-content: center;
+  cursor: zoom-out;
+}
+.fs-lightbox-svg[hidden] { display: none; }
+.fs-lightbox-svg svg {
+  width: auto; height: auto; max-width: 92vw; max-height: 92vh;
+}
 .fs-lightbox-img {
   max-width: 92vw; max-height: 92vh; object-fit: contain; border-radius: 4px;
   box-shadow: 0 12px 40px rgba(0,0,0,.45); cursor: zoom-out;

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         工作台 · 即刻
 // @namespace    fish-site-work-mode
-// @version      0.9.0
+// @version      0.9.1
 // @description  把即刻变成工作台：左栏动态、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT
@@ -262,6 +262,16 @@
   background: transparent; border-radius: 2px; cursor: default; margin: 0 1px;
   vertical-align: -0.2em;
 }
+.fs-post-body svg.fs-thumb-svg {
+  width: 88px; height: 60px; max-width: 88px; max-height: 60px; cursor: zoom-in;
+  border: 1px solid #ececec; background: #f4f4f4; border-radius: 4px; padding: 2px;
+  vertical-align: middle; margin: 2px 4px 2px 0;
+}
+.fs-post-body svg.fs-thumb-svg:hover { border-color: #07c160; }
+.fs-post-body svg.fs-inline-svg {
+  width: auto; height: auto; max-width: 100%; max-height: 1.6em; border: 0;
+  background: transparent; vertical-align: -0.2em;
+}
 .fs-post-body video { max-width: 100%; height: auto; border-radius: 4px; }
 .fs-post-body pre {
   margin: 1em 0; padding: 12px; overflow: auto; border-radius: 6px; background: #f6f8fa;
@@ -374,6 +384,15 @@
   background: rgba(0,0,0,.82); pointer-events: auto; cursor: zoom-out;
 }
 .fs-lightbox[hidden] { display: none; }
+.fs-lightbox-img[hidden] { display: none; }
+.fs-lightbox-svg {
+  max-width: 92vw; max-height: 92vh; display: flex; align-items: center; justify-content: center;
+  cursor: zoom-out;
+}
+.fs-lightbox-svg[hidden] { display: none; }
+.fs-lightbox-svg svg {
+  width: auto; height: auto; max-width: 92vw; max-height: 92vh;
+}
 .fs-lightbox-img {
   max-width: 92vw; max-height: 92vh; object-fit: contain; border-radius: 4px;
   box-shadow: 0 12px 40px rgba(0,0,0,.45); cursor: zoom-out;
@@ -622,6 +641,7 @@
     </div>
     <div class="fs-lightbox" id="fs-lightbox" hidden>
       <button class="fs-lightbox-close" id="fs-lightbox-close" type="button" title="关闭">×</button>
+      <div class="fs-lightbox-svg" id="fs-lightbox-svg" hidden></div>
       <img class="fs-lightbox-img" id="fs-lightbox-img" alt="">
     </div>
     <div class="fs-ball" id="fs-ball" hidden>鱼</div>
@@ -658,6 +678,7 @@
     const toastEl = must("#fs-toast");
     const lightbox = must("#fs-lightbox");
     const lightboxImg = must("#fs-lightbox-img");
+    const lightboxSvg = must("#fs-lightbox-svg");
     const lightboxClose = must("#fs-lightbox-close");
     let originalTitle = document.title;
     let originalFavicons = [];
@@ -693,17 +714,35 @@
       const original = image.currentSrc || image.src;
       const zoom = zoomSource(image) || original;
       if (!zoom) return;
+      lightboxSvg.hidden = true;
+      lightboxSvg.innerHTML = "";
+      lightboxImg.hidden = false;
       lightboxImg.dataset.original = original;
       lightboxImg.src = zoom;
       lightboxImg.alt = image.alt || "";
       lightbox.hidden = false;
       app.classList.add("fs-lightbox-open");
     }
+    function openSvgLightbox(svg) {
+      const clone = svg.cloneNode(true);
+      clone.classList.remove("fs-thumb-svg", "fs-inline-svg");
+      clone.removeAttribute("style");
+      lightboxImg.hidden = true;
+      lightboxImg.removeAttribute("src");
+      lightboxSvg.innerHTML = "";
+      lightboxSvg.appendChild(clone);
+      lightboxSvg.hidden = false;
+      lightbox.hidden = false;
+      app.classList.add("fs-lightbox-open");
+    }
     function closeLightbox() {
       if (lightbox.hidden) return;
       lightbox.hidden = true;
+      lightboxImg.hidden = false;
       lightboxImg.removeAttribute("src");
       lightboxImg.removeAttribute("data-original");
+      lightboxSvg.hidden = true;
+      lightboxSvg.innerHTML = "";
       app.classList.remove("fs-lightbox-open");
     }
     lightboxImg.addEventListener("error", () => {
@@ -711,7 +750,8 @@
       if (original && lightboxImg.src !== original) lightboxImg.src = original;
     });
     lightbox.addEventListener("click", (event) => {
-      if (event.target === lightbox || event.target === lightboxImg || event.target === lightboxClose) {
+      const target = event.target;
+      if (target === lightbox || target === lightboxImg || target === lightboxClose || !lightboxSvg.hidden && lightboxSvg.contains(target)) {
         closeLightbox();
       }
     });
@@ -816,7 +856,7 @@
     function setBrandAndFoot() {
       brand.textContent = state.workMode ? "工作目录" : adapter.normalTitle;
       brand.title = state.workMode ? "点击恢复会话列表" : "点击切换工作目录";
-      sideFoot.textContent = state.workMode ? coverStory.footer : "最近会话";
+      sideFoot.textContent = state.workMode ? coverStory.footer : state.searchMode ? "搜索结果" : adapter.listLabel?.() || "最近会话";
     }
     function updateSearchUi() {
       const supported = Boolean(adapter.searchConversations);
@@ -889,7 +929,7 @@
         </div>`;
       }).join("");
       const moreAvailable = state.searchMode ? Boolean(adapter.searchConversations) : Boolean(adapter.loadMoreConversations);
-      const more = state.listHasMore && moreAvailable ? `<button class="fs-list-more" type="button"${state.listLoading ? " disabled" : ""}>${state.listLoading ? "加载中…" : state.searchMode ? "加载更多结果" : "加载更多话题"}</button>` : "";
+      const more = state.listHasMore && moreAvailable ? `<button class="fs-list-more" type="button"${state.listLoading ? " disabled" : ""}>${state.listLoading ? "加载中…" : state.searchMode ? "加载更多结果" : "加载更多"}</button>` : "";
       list.innerHTML = items + more;
     }
     function renderSidebar() {
@@ -944,6 +984,22 @@
         };
         if (image.complete) markInline();
         else image.addEventListener("load", markInline, { once: true });
+      });
+      root.querySelectorAll(".fs-post-body svg").forEach((svg) => {
+        if (svg.parentElement?.closest("svg")) return;
+        const className = String(svg.getAttribute("class") || "");
+        if (/emoji|icon|avatar/i.test(className)) {
+          svg.classList.add("fs-inline-svg");
+          return;
+        }
+        const rect = svg.getBoundingClientRect();
+        const attributeWidth = Number(svg.getAttribute("width") || 0);
+        const attributeHeight = Number(svg.getAttribute("height") || 0);
+        const viewBox = (svg.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number);
+        const width = rect.width || attributeWidth || viewBox[2] || 0;
+        const height = rect.height || attributeHeight || viewBox[3] || 0;
+        if (width >= 48 && height >= 48) svg.classList.add("fs-thumb-svg");
+        else svg.classList.add("fs-inline-svg");
       });
     }
     async function handleLoadMore(button) {
@@ -1271,6 +1327,13 @@
         }
       }
       const anchor = target?.closest?.("a") ?? null;
+      const svg = target?.closest?.("svg.fs-thumb-svg");
+      if (svg && svg.closest(".fs-post-body")) {
+        event.preventDefault();
+        event.stopPropagation();
+        openSvgLightbox(svg);
+        return;
+      }
       if (!anchor) return;
       const href = anchor.getAttribute("href");
       if (!href || href.startsWith("#")) return;
@@ -1542,6 +1605,10 @@
     '[class*="_postItem_"]',
     "article"
   ];
+  var JIKE_API = "https://api.ruguoapp.com";
+  var RECOMMEND_FEED = "/1.0/recommendFeed/list";
+  var FOLLOWING_FEED = "/1.0/personalUpdate/followingUpdates";
+  var SEARCH_API = "/1.0/search/integrate";
   var CONTENT_SELECTORS = [
     '[class*="_text_"]',
     '[class*="_content_"]',
@@ -1802,6 +1869,179 @@
       hasMore: false
     };
   }
+  function jikeToken() {
+    try {
+      return localStorage.getItem("JK_ACCESS_TOKEN");
+    } catch {
+      return null;
+    }
+  }
+  function jikeDeviceId() {
+    try {
+      return localStorage.getItem("JK_DEVICE_ID") || "";
+    } catch {
+      return "";
+    }
+  }
+  async function jikeApi(path, params = {}) {
+    const token = jikeToken();
+    if (!token) throw new Error("未找到即刻登录凭证");
+    const url = new URL(path, JIKE_API);
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== void 0 && value !== "") url.searchParams.set(key, value);
+    }
+    const headers = {
+      accept: "application/json",
+      platform: "web",
+      "x-jike-access-token": token
+    };
+    const deviceId = jikeDeviceId();
+    if (deviceId) headers["x-jike-device-id"] = deviceId;
+    const response = await fetch(url.href, { headers, credentials: "include" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  }
+  function feedEndpoint(url) {
+    if (url.pathname === "/following" || url.pathname === "/following/") {
+      return { path: FOLLOWING_FEED, label: "关注" };
+    }
+    if (url.pathname === "/" || /^\/explore\/?$/.test(url.pathname)) {
+      return { path: RECOMMEND_FEED, label: "推荐" };
+    }
+    return null;
+  }
+  var apiPosts = /* @__PURE__ */ new Map();
+  var currentFeedLabel = "推荐";
+  function storeApiPosts(posts) {
+    for (const post of posts) {
+      if (post?.id) apiPosts.set(`post:${post.id}`, post);
+    }
+  }
+  function apiAuthor(post) {
+    return String(post.user?.screenName || post.user?.username || "即刻用户");
+  }
+  function apiAvatar(post, baseUrl) {
+    const image = post.user?.avatarImage;
+    return absoluteUrl(image?.thumbnailUrl || image?.picUrl || image?.middlePicUrl, baseUrl);
+  }
+  function apiText(post) {
+    const own = String(post.content || "").trim();
+    if (own) return own;
+    const target = post.target || post.repost;
+    return String(target?.content || "").trim();
+  }
+  function apiCreated(post) {
+    const parsed = Date.parse(String(post.createdAt || ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  function apiPostToConversation(post, baseUrl) {
+    if (!post?.id) return null;
+    const author = apiAuthor(post);
+    const text = apiText(post);
+    const pictures = post.pictures ?? [];
+    const media = pictures.length ? `[${pictures.length} 张图]` : post.video ? "[视频]" : "";
+    const subtitle = [text.slice(0, 80), media].filter(Boolean).join(" · ");
+    return {
+      id: `post:${post.id}`,
+      title: author,
+      subtitle: subtitle || "即刻",
+      avatar: apiAvatar(post, baseUrl),
+      avatarFallback: author,
+      updatedAt: apiCreated(post)
+    };
+  }
+  function appendApiPictures(pictures, baseUrl, parts) {
+    for (const picture of pictures ?? []) {
+      const src = absoluteUrl(
+        picture.picUrl || picture.middlePicUrl || picture.smallPicUrl || picture.thumbnailUrl,
+        baseUrl
+      );
+      if (src) parts.push(`<p><img src="${escapeAttr(src)}" alt="" loading="lazy"></p>`);
+    }
+  }
+  function appendApiVideo(video, baseUrl, parts) {
+    if (!video) return;
+    const src = absoluteUrl(video.url || video.playUrl || video.fileUrl, baseUrl);
+    if (!src) return;
+    const poster = absoluteUrl(video.thumbnailUrl, baseUrl);
+    parts.push(
+      `<p><video src="${escapeAttr(src)}"${poster ? ` poster="${escapeAttr(poster)}"` : ""} controls></video></p>`
+    );
+  }
+  function apiPostView(post, baseUrl) {
+    const author = apiAuthor(post);
+    const avatar = apiAvatar(post, baseUrl);
+    const created = apiCreated(post);
+    const ownText = String(post.content || "").trim();
+    const target = post.target || post.repost;
+    const targetText = String(target?.content || "").trim();
+    const parts = [];
+    if (ownText) parts.push(`<p>${escapeHtml(ownText).replace(/\r?\n/g, "<br>")}</p>`);
+    appendApiPictures(post.pictures, baseUrl, parts);
+    appendApiVideo(post.video, baseUrl, parts);
+    if (post.linkInfo?.linkUrl) {
+      const href = absoluteUrl(post.linkInfo.linkUrl, baseUrl);
+      if (href) {
+        parts.push(
+          `<p><a href="${escapeAttr(href)}" target="_blank" rel="noreferrer">${escapeHtml(
+            post.linkInfo.title || href
+          )}</a></p>`
+        );
+      }
+    }
+    if (target) {
+      const quote = [];
+      if (targetText) {
+        quote.push(`<p>${escapeHtml(targetText).replace(/\r?\n/g, "<br>")}</p>`);
+      }
+      appendApiPictures(target.pictures, baseUrl, quote);
+      appendApiVideo(target.video, baseUrl, quote);
+      if (quote.length) parts.push(`<blockquote class="fs-quote">${quote.join("")}</blockquote>`);
+    }
+    const content = parts.length ? parts.join("") : "<p></p>";
+    const textLength = normalizeText(`${ownText} ${targetText}`).length;
+    const meta = [timeAgo(created), textLength ? `${textLength} 字` : ""].filter(Boolean).join(" · ");
+    const title = author || ownText.slice(0, 30) || "即刻";
+    return {
+      title,
+      subtitle: meta || "即刻",
+      html: `<h1 class="fs-topic-title">${escapeHtml(title)}</h1><div class="fs-topic-meta">${escapeHtml(meta || "即刻")}</div>` + createPost(author, avatar, "动态", created, content),
+      hasMore: false
+    };
+  }
+  async function fetchApiPost(postId) {
+    if (!jikeToken()) return null;
+    try {
+      const data = await jikeApi("/1.0/originalPosts/get", { id: postId });
+      if (data?.data) return data.data;
+    } catch {
+    }
+    try {
+      const data = await jikeApi("/1.0/reposts/get", { id: postId });
+      return data?.data ?? null;
+    } catch {
+      return null;
+    }
+  }
+  function scrollJikeFeed() {
+    const scrollers = [
+      ...document.querySelectorAll(
+        "[data-can-scroll-forward], [data-can-scroll-backward]"
+      )
+    ];
+    let target = scrollers.find((element) => element.scrollHeight > element.clientHeight + 50);
+    if (!target) {
+      target = [...document.querySelectorAll("div, main, section")].filter((element) => element.scrollHeight > element.clientHeight + 200).sort(
+        (a, b) => b.scrollHeight - b.clientHeight - (a.scrollHeight - a.clientHeight)
+      )[0];
+    }
+    if (target) {
+      target.scrollTop = target.scrollHeight;
+      target.dispatchEvent(new Event("scroll", { bubbles: true }));
+    } else {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+    }
+  }
   function postIdFromUrl(url) {
     return url.pathname.match(/^\/(?:originalPosts?|originalPost)\/([A-Za-z0-9]+)/)?.[1] || url.pathname.match(/^\/u\/[^/]+\/(?:post|repost|comment)\/([A-Za-z0-9]+)/)?.[1] || null;
   }
@@ -1827,10 +2067,27 @@
     }
     return null;
   }
+  async function loadMoreFromDom() {
+    const before = new Set(cardElements.keys());
+    scrollJikeFeed();
+    await new Promise((resolve) => window.setTimeout(resolve, 1600));
+    const url = new URL(location.href);
+    const parsed = parseJikeList(document, location.href, postIdFromUrl(url) || void 0);
+    cardElements = parsed.elements;
+    const added = parsed.conversations.filter((conversation) => !before.has(conversation.id));
+    return {
+      conversations: added,
+      hasMore: added.length > 0,
+      cursor: { kind: "dom" }
+    };
+  }
   var jikeAdapter = {
     id: "jike",
     label: "即刻",
     normalTitle: "微信",
+    listLabel() {
+      return currentFeedLabel;
+    },
     match(url) {
       return url.hostname === "web.okjike.com";
     },
@@ -1849,12 +2106,43 @@
     },
     async listConversations() {
       cardElements = /* @__PURE__ */ new Map();
-      await waitForSelector(CARD_SELECTORS, 8e3);
+      apiPosts = /* @__PURE__ */ new Map();
       const url = new URL(location.href);
+      const feed = feedEndpoint(url);
+      currentFeedLabel = feed ? feed.label : postIdFromUrl(url) ? "动态" : isJikeProfile(url) ? "用户动态" : isJikeTopic(url) ? "话题" : "推荐";
+      if (feed && jikeToken()) {
+        try {
+          const data = await jikeApi(feed.path, { limit: "20" });
+          const posts = Array.isArray(data.data) ? data.data : [];
+          const conversations = posts.map((post) => apiPostToConversation(post, location.href)).filter((conversation) => conversation !== null);
+          if (conversations.length) {
+            storeApiPosts(posts);
+            return {
+              conversations,
+              hasMore: Boolean(data.loadMoreKey),
+              cursor: {
+                kind: "feed",
+                path: feed.path,
+                loadMoreKey: data.loadMoreKey ?? ""
+              }
+            };
+          }
+        } catch (error) {
+          console.info("[工作台][即刻] 推荐流 API 不可用，回退页面解析", error);
+        }
+      }
+      await waitForSelector(CARD_SELECTORS, 8e3);
       const postId = postIdFromUrl(url);
       const parsed = parseJikeList(document, location.href, postId || void 0);
       cardElements = parsed.elements;
-      if (parsed.conversations.length) return parsed.conversations;
+      if (parsed.conversations.length) {
+        if (postId) return parsed.conversations;
+        return {
+          conversations: parsed.conversations,
+          hasMore: true,
+          cursor: { kind: "dom" }
+        };
+      }
       console.info("[工作台][即刻] 未找到动态卡片", {
         post: document.querySelectorAll('[class*="_post_"]').length,
         postCard: document.querySelectorAll('[class*="_postCard_"]').length,
@@ -1865,6 +2153,57 @@
       });
       throw new Error("未找到即刻内容（可能需要登录；控制台已输出页面结构计数）");
     },
+    async loadMoreConversations(cursor) {
+      if (cursor && typeof cursor === "object" && "kind" in cursor) {
+        const state = cursor;
+        if (state.kind === "feed" && state.path && jikeToken()) {
+          try {
+            const data = await jikeApi(state.path, {
+              limit: "20",
+              loadMoreKey: state.loadMoreKey
+            });
+            const posts = Array.isArray(data.data) ? data.data : [];
+            const conversations = posts.map((post) => apiPostToConversation(post, location.href)).filter((conversation) => conversation !== null);
+            storeApiPosts(posts);
+            return {
+              conversations,
+              hasMore: Boolean(data.loadMoreKey),
+              cursor: {
+                kind: "feed",
+                path: state.path,
+                loadMoreKey: data.loadMoreKey ?? ""
+              }
+            };
+          } catch (error) {
+            console.info("[工作台][即刻] 加载更多 API 不可用，回退页面滚动", error);
+          }
+        }
+      }
+      return loadMoreFromDom();
+    },
+    async searchConversations(query, cursor) {
+      const state = cursor && typeof cursor === "object" && "kind" in cursor ? cursor : null;
+      const data = await jikeApi(SEARCH_API, {
+        keywords: query,
+        limit: "20",
+        loadMoreKey: state?.kind === "search" ? state.loadMoreKey : void 0
+      });
+      const seen = /* @__PURE__ */ new Set();
+      const posts = (Array.isArray(data.data) ? data.data : []).filter((item) => {
+        if (!item?.id || !item.user) return false;
+        if (!item.content && !item.pictures?.length && !item.video) return false;
+        if (seen.has(item.id)) return false;
+        seen.add(item.id);
+        return true;
+      });
+      const conversations = posts.map((post) => apiPostToConversation(post, location.href)).filter((conversation) => conversation !== null);
+      storeApiPosts(posts);
+      return {
+        conversations,
+        hasMore: Boolean(data.loadMoreKey),
+        cursor: { kind: "search", query, loadMoreKey: data.loadMoreKey ?? "" }
+      };
+    },
     async openConversation(id) {
       let element = cardElements.get(id);
       if (!element || !element.isConnected) {
@@ -1872,16 +2211,24 @@
           element = findCardByPostId(id.slice("post:".length)) || void 0;
         }
       }
-      if (!element && id.startsWith("post:")) {
+      if (element?.isConnected) {
+        return jikeView(element, location.href);
+      }
+      if (id.startsWith("post:")) {
+        const post = apiPosts.get(id) || await fetchApiPost(id.slice("post:".length));
+        if (post) {
+          if (!apiPosts.has(id)) apiPosts.set(id, post);
+          return apiPostView(post, location.href);
+        }
+      }
+      if (id.startsWith("post:")) {
         const postId = postIdFromUrl(new URL(location.href));
         if (postId && id === `post:${postId}`) {
           element = cardCandidates(document)[0];
+          if (element) return jikeView(element, location.href);
         }
       }
-      if (!element || !element.isConnected) {
-        throw new Error("内容已刷新，请重新打开即刻页面");
-      }
-      return jikeView(element, location.href);
+      throw new Error("内容已刷新，请重新打开即刻页面");
     }
   };
   var tree = [

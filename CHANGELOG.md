@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.9.1 — 2026-11-24
+
+即刻列表修复、API 化，以及内联 SVG 缩略图。
+
+### 修复
+
+- 即刻首页 feed 实际使用 `_post_160sp_5`，旧版只匹配 `_postCard_` / `_postItem_`，导致首页列表为空
+- 增加从 `<time>` 往上找卡片的兜底，降低 hash class 变化带来的影响
+
+### 新增
+
+- 即刻推荐流 / 关注流 API：
+  - `/1.0/recommendFeed/list`
+  - `/1.0/personalUpdate/followingUpdates`
+  - 使用页面已有的 `JK_ACCESS_TOKEN` / `JK_DEVICE_ID` 做只读 GET
+- 即刻搜索 API `/1.0/search/integrate`
+- 左栏「加载更多」使用 `loadMoreKey` 分页；API 不可用时回退 live DOM + 滚动加载
+- 左栏底部显示当前流：推荐 / 关注 / 用户动态 / 话题
+- 正文内联 SVG 也按 88 × 60 缩略图显示，点击后在灯箱里矢量放大
+- 新增即刻 API、SVG 缩略图测试，测试总数 53
+
 ## 0.9.0 — 2026-11-24
 
 linux.do 搜索，以及更隐蔽的图片缩略图。
@@ -16,7 +37,6 @@ linux.do 搜索，以及更隐蔽的图片缩略图。
 - 阅读区图片默认显示 **88 × 60** 的小缩略图（`object-fit: cover`）
 - 点击缩略图打开灯箱；emoji、图标、头像不套用缩略图样式
 - 图片在加载完成后如果本身很小，会自动切回内联小图
-- 新增 linux.do 搜索、搜索 UI、缩略图相关测试，测试总数 47
 
 ## 0.8.0 — 2026-11-24
 
@@ -44,7 +64,7 @@ linux.do 搜索，以及更隐蔽的图片缩略图。
 ### 新增
 
 - 会话列表分页接口：`SiteAdapter.listConversations()` 可以返回 `ConversationPage`，并可选实现 `loadMoreConversations(cursor)`
-- 左栏底部新增「加载更多话题」按钮，加载后保持滚动位置并去重
+- 左栏底部新增「加载更多」按钮，加载后保持滚动位置并去重
 - linux.do 首次加载最新话题第 1、2 页（约 60 条），之后按页继续加载
 - linux.do 修正分页起点：从 `page=0`（第 1 页）开始，不再跳过最前面的话题
 - 新增 linux.do 两页合并、侧栏加载更多、`autoOpenFirst` 等测试，测试总数 39

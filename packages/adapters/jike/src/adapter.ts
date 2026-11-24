@@ -1,6 +1,7 @@
 import type {
   ContentView,
   Conversation,
+  ConversationPage,
   CoverStory,
   SiteAdapter,
   SiteContext,
@@ -26,6 +27,67 @@ const CARD_SELECTORS = [
   '[class*="_postItem_"]',
   "article",
 ];
+
+const JIKE_API = "https://api.ruguoapp.com";
+const RECOMMEND_FEED = "/1.0/recommendFeed/list";
+const FOLLOWING_FEED = "/1.0/personalUpdate/followingUpdates";
+const SEARCH_API = "/1.0/search/integrate";
+
+interface JikeApiUser {
+  username?: string;
+  screenName?: string;
+  avatarImage?: {
+    picUrl?: string;
+    thumbnailUrl?: string;
+    middlePicUrl?: string;
+  };
+}
+
+interface JikeApiPicture {
+  picUrl?: string;
+  middlePicUrl?: string;
+  smallPicUrl?: string;
+  thumbnailUrl?: string;
+  width?: number;
+  height?: number;
+}
+
+interface JikeApiVideo {
+  url?: string;
+  playUrl?: string;
+  fileUrl?: string;
+  thumbnailUrl?: string;
+  duration?: number;
+}
+
+interface JikeApiPost {
+  id?: string;
+  type?: string;
+  content?: string;
+  createdAt?: string;
+  user?: JikeApiUser;
+  pictures?: JikeApiPicture[];
+  video?: JikeApiVideo;
+  linkInfo?: { title?: string; linkUrl?: string; pictureUrl?: string };
+  target?: JikeApiPost;
+  repost?: JikeApiPost;
+  likeCount?: number;
+  commentCount?: number;
+}
+
+interface JikeFeedResponse {
+  data?: JikeApiPost[];
+  loadMoreKey?: string;
+}
+
+interface JikeSearchItem extends JikeApiPost {
+  type?: string;
+}
+
+interface JikeSearchResponse {
+  data?: JikeSearchItem[];
+  loadMoreKey?: string;
+}
 
 const CONTENT_SELECTORS = [
   '[class*="_text_"]',
@@ -357,6 +419,227 @@ export function jikeView(card: Element, baseUrl: string): ContentView {
   };
 }
 
+function jikeToken(): string | null {
+  try {
+    return localStorage.getItem("JK_ACCESS_TOKEN");
+  } catch {
+    return null;
+  }
+}
+
+function jikeDeviceId(): string {
+  try {
+    return localStorage.getItem("JK_DEVICE_ID") || "";
+  } catch {
+    return "";
+  }
+}
+
+async function jikeApi<T>(
+  path: string,
+  params: Record<string, string | undefined> = {},
+): Promise<T> {
+  const token = jikeToken();
+  if (!token) throw new Error("未找到即刻登录凭证");
+  const url = new URL(path, JIKE_API);
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") url.searchParams.set(key, value);
+  }
+  const headers: Record<string, string> = {
+    accept: "application/json",
+    platform: "web",
+    "x-jike-access-token": token,
+  };
+  const deviceId = jikeDeviceId();
+  if (deviceId) headers["x-jike-device-id"] = deviceId;
+
+  const response = await fetch(url.href, { headers, credentials: "include" });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return (await response.json()) as T;
+}
+
+function feedEndpoint(url: URL): { path: string; label: string } | null {
+  if (url.pathname === "/following" || url.pathname === "/following/") {
+    return { path: FOLLOWING_FEED, label: "关注" };
+  }
+  if (url.pathname === "/" || /^\/explore\/?$/.test(url.pathname)) {
+    return { path: RECOMMEND_FEED, label: "推荐" };
+  }
+  return null;
+}
+
+let apiPosts = new Map<string, JikeApiPost>();
+let currentFeedLabel = "推荐";
+
+function storeApiPosts(posts: JikeApiPost[]): void {
+  for (const post of posts) {
+    if (post?.id) apiPosts.set(`post:${post.id}`, post);
+  }
+}
+
+function apiAuthor(post: JikeApiPost): string {
+  return String(post.user?.screenName || post.user?.username || "即刻用户");
+}
+
+function apiAvatar(post: JikeApiPost, baseUrl: string): string {
+  const image = post.user?.avatarImage;
+  return absoluteUrl(image?.thumbnailUrl || image?.picUrl || image?.middlePicUrl, baseUrl);
+}
+
+function apiText(post: JikeApiPost): string {
+  const own = String(post.content || "").trim();
+  if (own) return own;
+  const target = post.target || post.repost;
+  return String(target?.content || "").trim();
+}
+
+function apiCreated(post: JikeApiPost): number {
+  const parsed = Date.parse(String(post.createdAt || ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function apiPostToConversation(
+  post: JikeApiPost,
+  baseUrl: string,
+): Conversation | null {
+  if (!post?.id) return null;
+  const author = apiAuthor(post);
+  const text = apiText(post);
+  const pictures = post.pictures ?? [];
+  const media = pictures.length
+    ? `[${pictures.length} 张图]`
+    : post.video
+      ? "[视频]"
+      : "";
+  const subtitle = [text.slice(0, 80), media].filter(Boolean).join(" · ");
+  return {
+    id: `post:${post.id}`,
+    title: author,
+    subtitle: subtitle || "即刻",
+    avatar: apiAvatar(post, baseUrl),
+    avatarFallback: author,
+    updatedAt: apiCreated(post),
+  };
+}
+
+function appendApiPictures(
+  pictures: JikeApiPicture[] | undefined,
+  baseUrl: string,
+  parts: string[],
+): void {
+  for (const picture of pictures ?? []) {
+    const src = absoluteUrl(
+      picture.picUrl || picture.middlePicUrl || picture.smallPicUrl || picture.thumbnailUrl,
+      baseUrl,
+    );
+    if (src) parts.push(`<p><img src="${escapeAttr(src)}" alt="" loading="lazy"></p>`);
+  }
+}
+
+function appendApiVideo(
+  video: JikeApiVideo | undefined,
+  baseUrl: string,
+  parts: string[],
+): void {
+  if (!video) return;
+  const src = absoluteUrl(video.url || video.playUrl || video.fileUrl, baseUrl);
+  if (!src) return;
+  const poster = absoluteUrl(video.thumbnailUrl, baseUrl);
+  parts.push(
+    `<p><video src="${escapeAttr(src)}"${poster ? ` poster="${escapeAttr(poster)}"` : ""} controls></video></p>`,
+  );
+}
+
+export function apiPostView(post: JikeApiPost, baseUrl: string): ContentView {
+  const author = apiAuthor(post);
+  const avatar = apiAvatar(post, baseUrl);
+  const created = apiCreated(post);
+  const ownText = String(post.content || "").trim();
+  const target = post.target || post.repost;
+  const targetText = String(target?.content || "").trim();
+  const parts: string[] = [];
+
+  if (ownText) parts.push(`<p>${escapeHtml(ownText).replace(/\r?\n/g, "<br>")}</p>`);
+  appendApiPictures(post.pictures, baseUrl, parts);
+  appendApiVideo(post.video, baseUrl, parts);
+  if (post.linkInfo?.linkUrl) {
+    const href = absoluteUrl(post.linkInfo.linkUrl, baseUrl);
+    if (href) {
+      parts.push(
+        `<p><a href="${escapeAttr(href)}" target="_blank" rel="noreferrer">${escapeHtml(
+          post.linkInfo.title || href,
+        )}</a></p>`,
+      );
+    }
+  }
+
+  if (target) {
+    const quote: string[] = [];
+    if (targetText) {
+      quote.push(`<p>${escapeHtml(targetText).replace(/\r?\n/g, "<br>")}</p>`);
+    }
+    appendApiPictures(target.pictures, baseUrl, quote);
+    appendApiVideo(target.video, baseUrl, quote);
+    if (quote.length) parts.push(`<blockquote class="fs-quote">${quote.join("")}</blockquote>`);
+  }
+
+  const content = parts.length ? parts.join("") : "<p></p>";
+  const textLength = normalizeText(`${ownText} ${targetText}`).length;
+  const meta = [timeAgo(created), textLength ? `${textLength} 字` : ""]
+    .filter(Boolean)
+    .join(" · ");
+  const title = author || ownText.slice(0, 30) || "即刻";
+
+  return {
+    title,
+    subtitle: meta || "即刻",
+    html:
+      `<h1 class="fs-topic-title">${escapeHtml(title)}</h1>` +
+      `<div class="fs-topic-meta">${escapeHtml(meta || "即刻")}</div>` +
+      createPost(author, avatar, "动态", created, content),
+    hasMore: false,
+  };
+}
+
+async function fetchApiPost(postId: string): Promise<JikeApiPost | null> {
+  if (!jikeToken()) return null;
+  try {
+    const data = await jikeApi<{ data?: JikeApiPost }>("/1.0/originalPosts/get", { id: postId });
+    if (data?.data) return data.data;
+  } catch {
+    // 原动态不存在时尝试转发接口
+  }
+  try {
+    const data = await jikeApi<{ data?: JikeApiPost }>("/1.0/reposts/get", { id: postId });
+    return data?.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function scrollJikeFeed(): void {
+  const scrollers = [
+    ...document.querySelectorAll<HTMLElement>(
+      "[data-can-scroll-forward], [data-can-scroll-backward]",
+    ),
+  ];
+  let target = scrollers.find((element) => element.scrollHeight > element.clientHeight + 50);
+  if (!target) {
+    target = [...document.querySelectorAll<HTMLElement>("div, main, section")]
+      .filter((element) => element.scrollHeight > element.clientHeight + 200)
+      .sort(
+        (a, b) =>
+          b.scrollHeight - b.clientHeight - (a.scrollHeight - a.clientHeight),
+      )[0];
+  }
+  if (target) {
+    target.scrollTop = target.scrollHeight;
+    target.dispatchEvent(new Event("scroll", { bubbles: true }));
+  } else {
+    window.scrollTo(0, document.documentElement.scrollHeight);
+  }
+}
+
 export function postIdFromUrl(url: URL): string | null {
   return (
     url.pathname.match(/^\/(?:originalPosts?|originalPost)\/([A-Za-z0-9]+)/)?.[1] ||
@@ -398,10 +681,29 @@ function findCardByPostId(postId: string): Element | null {
   return null;
 }
 
+async function loadMoreFromDom(): Promise<ConversationPage> {
+  const before = new Set(cardElements.keys());
+  scrollJikeFeed();
+  await new Promise((resolve) => window.setTimeout(resolve, 1600));
+  const url = new URL(location.href);
+  const parsed = parseJikeList(document, location.href, postIdFromUrl(url) || undefined);
+  cardElements = parsed.elements;
+  const added = parsed.conversations.filter((conversation) => !before.has(conversation.id));
+  return {
+    conversations: added,
+    hasMore: added.length > 0,
+    cursor: { kind: "dom" },
+  };
+}
+
 export const jikeAdapter: SiteAdapter = {
   id: "jike",
   label: "即刻",
   normalTitle: "微信",
+
+  listLabel(): string {
+    return currentFeedLabel;
+  },
 
   match(url: URL): boolean {
     return url.hostname === "web.okjike.com";
@@ -422,14 +724,57 @@ export const jikeAdapter: SiteAdapter = {
     return postId ? `post:${postId}` : null;
   },
 
-  async listConversations(): Promise<Conversation[]> {
+  async listConversations(): Promise<Conversation[] | ConversationPage> {
     cardElements = new Map();
-    await waitForSelector(CARD_SELECTORS, 8000);
+    apiPosts = new Map();
     const url = new URL(location.href);
+    const feed = feedEndpoint(url);
+    currentFeedLabel = feed
+      ? feed.label
+      : postIdFromUrl(url)
+        ? "动态"
+        : isJikeProfile(url)
+          ? "用户动态"
+          : isJikeTopic(url)
+            ? "话题"
+            : "推荐";
+
+    if (feed && jikeToken()) {
+      try {
+        const data = await jikeApi<JikeFeedResponse>(feed.path, { limit: "20" });
+        const posts = Array.isArray(data.data) ? data.data : [];
+        const conversations = posts
+          .map((post) => apiPostToConversation(post, location.href))
+          .filter((conversation): conversation is Conversation => conversation !== null);
+        if (conversations.length) {
+          storeApiPosts(posts);
+          return {
+            conversations,
+            hasMore: Boolean(data.loadMoreKey),
+            cursor: {
+              kind: "feed",
+              path: feed.path,
+              loadMoreKey: data.loadMoreKey ?? "",
+            },
+          };
+        }
+      } catch (error) {
+        console.info("[工作台][即刻] 推荐流 API 不可用，回退页面解析", error);
+      }
+    }
+
+    await waitForSelector(CARD_SELECTORS, 8000);
     const postId = postIdFromUrl(url);
     const parsed = parseJikeList(document, location.href, postId || undefined);
     cardElements = parsed.elements;
-    if (parsed.conversations.length) return parsed.conversations;
+    if (parsed.conversations.length) {
+      if (postId) return parsed.conversations;
+      return {
+        conversations: parsed.conversations,
+        hasMore: true,
+        cursor: { kind: "dom" },
+      };
+    }
     console.info("[工作台][即刻] 未找到动态卡片", {
       post: document.querySelectorAll('[class*="_post_"]').length,
       postCard: document.querySelectorAll('[class*="_postCard_"]').length,
@@ -441,6 +786,66 @@ export const jikeAdapter: SiteAdapter = {
     throw new Error("未找到即刻内容（可能需要登录；控制台已输出页面结构计数）");
   },
 
+  async loadMoreConversations(cursor: unknown): Promise<ConversationPage> {
+    if (cursor && typeof cursor === "object" && "kind" in cursor) {
+      const state = cursor as { kind?: string; path?: string; loadMoreKey?: string };
+      if (state.kind === "feed" && state.path && jikeToken()) {
+        try {
+          const data = await jikeApi<JikeFeedResponse>(state.path, {
+            limit: "20",
+            loadMoreKey: state.loadMoreKey,
+          });
+          const posts = Array.isArray(data.data) ? data.data : [];
+          const conversations = posts
+            .map((post) => apiPostToConversation(post, location.href))
+            .filter((conversation): conversation is Conversation => conversation !== null);
+          storeApiPosts(posts);
+          return {
+            conversations,
+            hasMore: Boolean(data.loadMoreKey),
+            cursor: {
+              kind: "feed",
+              path: state.path,
+              loadMoreKey: data.loadMoreKey ?? "",
+            },
+          };
+        } catch (error) {
+          console.info("[工作台][即刻] 加载更多 API 不可用，回退页面滚动", error);
+        }
+      }
+    }
+    return loadMoreFromDom();
+  },
+
+  async searchConversations(query: string, cursor?: unknown): Promise<ConversationPage> {
+    const state =
+      cursor && typeof cursor === "object" && "kind" in cursor
+        ? (cursor as { kind?: string; loadMoreKey?: string })
+        : null;
+    const data = await jikeApi<JikeSearchResponse>(SEARCH_API, {
+      keywords: query,
+      limit: "20",
+      loadMoreKey: state?.kind === "search" ? state.loadMoreKey : undefined,
+    });
+    const seen = new Set<string>();
+    const posts = (Array.isArray(data.data) ? data.data : []).filter((item) => {
+      if (!item?.id || !item.user) return false;
+      if (!item.content && !item.pictures?.length && !item.video) return false;
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+    const conversations = posts
+      .map((post) => apiPostToConversation(post, location.href))
+      .filter((conversation): conversation is Conversation => conversation !== null);
+    storeApiPosts(posts);
+    return {
+      conversations,
+      hasMore: Boolean(data.loadMoreKey),
+      cursor: { kind: "search", query, loadMoreKey: data.loadMoreKey ?? "" },
+    };
+  },
+
   async openConversation(id: string): Promise<ContentView> {
     let element = cardElements.get(id);
     if (!element || !element.isConnected) {
@@ -448,16 +853,26 @@ export const jikeAdapter: SiteAdapter = {
         element = findCardByPostId(id.slice("post:".length)) || undefined;
       }
     }
-    if (!element && id.startsWith("post:")) {
+    if (element?.isConnected) {
+      return jikeView(element, location.href);
+    }
+
+    if (id.startsWith("post:")) {
+      const post = apiPosts.get(id) || (await fetchApiPost(id.slice("post:".length)));
+      if (post) {
+        if (!apiPosts.has(id)) apiPosts.set(id, post);
+        return apiPostView(post, location.href);
+      }
+    }
+
+    if (id.startsWith("post:")) {
       const postId = postIdFromUrl(new URL(location.href));
       if (postId && id === `post:${postId}`) {
         element = cardCandidates(document)[0];
+        if (element) return jikeView(element, location.href);
       }
     }
-    if (!element || !element.isConnected) {
-      throw new Error("内容已刷新，请重新打开即刻页面");
-    }
-    return jikeView(element, location.href);
+    throw new Error("内容已刷新，请重新打开即刻页面");
   },
 };
 

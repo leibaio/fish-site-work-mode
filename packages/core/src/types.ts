@@ -78,6 +78,8 @@ export interface SiteAdapter {
   label: string;
   /** 非工作模式下左栏标题，例如「微信」 */
   normalTitle: string;
+  /** 可选：非工作模式下左栏底部标签，例如「推荐」「关注」 */
+  listLabel?(): string;
   match(url: URL): boolean;
   detect(): Promise<SiteContext | null>;
   listConversations(): Promise<Conversation[] | ConversationPage>;

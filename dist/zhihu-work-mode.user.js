@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         工作台 · 知乎
 // @namespace    fish-site-work-mode
-// @version      0.9.0
+// @version      0.9.1
 // @description  把知乎变成工作台：左栏回答/推荐、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT
@@ -263,6 +263,16 @@
   background: transparent; border-radius: 2px; cursor: default; margin: 0 1px;
   vertical-align: -0.2em;
 }
+.fs-post-body svg.fs-thumb-svg {
+  width: 88px; height: 60px; max-width: 88px; max-height: 60px; cursor: zoom-in;
+  border: 1px solid #ececec; background: #f4f4f4; border-radius: 4px; padding: 2px;
+  vertical-align: middle; margin: 2px 4px 2px 0;
+}
+.fs-post-body svg.fs-thumb-svg:hover { border-color: #07c160; }
+.fs-post-body svg.fs-inline-svg {
+  width: auto; height: auto; max-width: 100%; max-height: 1.6em; border: 0;
+  background: transparent; vertical-align: -0.2em;
+}
 .fs-post-body video { max-width: 100%; height: auto; border-radius: 4px; }
 .fs-post-body pre {
   margin: 1em 0; padding: 12px; overflow: auto; border-radius: 6px; background: #f6f8fa;
@@ -375,6 +385,15 @@
   background: rgba(0,0,0,.82); pointer-events: auto; cursor: zoom-out;
 }
 .fs-lightbox[hidden] { display: none; }
+.fs-lightbox-img[hidden] { display: none; }
+.fs-lightbox-svg {
+  max-width: 92vw; max-height: 92vh; display: flex; align-items: center; justify-content: center;
+  cursor: zoom-out;
+}
+.fs-lightbox-svg[hidden] { display: none; }
+.fs-lightbox-svg svg {
+  width: auto; height: auto; max-width: 92vw; max-height: 92vh;
+}
 .fs-lightbox-img {
   max-width: 92vw; max-height: 92vh; object-fit: contain; border-radius: 4px;
   box-shadow: 0 12px 40px rgba(0,0,0,.45); cursor: zoom-out;
@@ -623,6 +642,7 @@
     </div>
     <div class="fs-lightbox" id="fs-lightbox" hidden>
       <button class="fs-lightbox-close" id="fs-lightbox-close" type="button" title="关闭">×</button>
+      <div class="fs-lightbox-svg" id="fs-lightbox-svg" hidden></div>
       <img class="fs-lightbox-img" id="fs-lightbox-img" alt="">
     </div>
     <div class="fs-ball" id="fs-ball" hidden>鱼</div>
@@ -659,6 +679,7 @@
     const toastEl = must("#fs-toast");
     const lightbox = must("#fs-lightbox");
     const lightboxImg = must("#fs-lightbox-img");
+    const lightboxSvg = must("#fs-lightbox-svg");
     const lightboxClose = must("#fs-lightbox-close");
     let originalTitle = document.title;
     let originalFavicons = [];
@@ -694,17 +715,35 @@
       const original = image.currentSrc || image.src;
       const zoom = zoomSource(image) || original;
       if (!zoom) return;
+      lightboxSvg.hidden = true;
+      lightboxSvg.innerHTML = "";
+      lightboxImg.hidden = false;
       lightboxImg.dataset.original = original;
       lightboxImg.src = zoom;
       lightboxImg.alt = image.alt || "";
       lightbox.hidden = false;
       app.classList.add("fs-lightbox-open");
     }
+    function openSvgLightbox(svg) {
+      const clone = svg.cloneNode(true);
+      clone.classList.remove("fs-thumb-svg", "fs-inline-svg");
+      clone.removeAttribute("style");
+      lightboxImg.hidden = true;
+      lightboxImg.removeAttribute("src");
+      lightboxSvg.innerHTML = "";
+      lightboxSvg.appendChild(clone);
+      lightboxSvg.hidden = false;
+      lightbox.hidden = false;
+      app.classList.add("fs-lightbox-open");
+    }
     function closeLightbox() {
       if (lightbox.hidden) return;
       lightbox.hidden = true;
+      lightboxImg.hidden = false;
       lightboxImg.removeAttribute("src");
       lightboxImg.removeAttribute("data-original");
+      lightboxSvg.hidden = true;
+      lightboxSvg.innerHTML = "";
       app.classList.remove("fs-lightbox-open");
     }
     lightboxImg.addEventListener("error", () => {
@@ -712,7 +751,8 @@
       if (original && lightboxImg.src !== original) lightboxImg.src = original;
     });
     lightbox.addEventListener("click", (event) => {
-      if (event.target === lightbox || event.target === lightboxImg || event.target === lightboxClose) {
+      const target = event.target;
+      if (target === lightbox || target === lightboxImg || target === lightboxClose || !lightboxSvg.hidden && lightboxSvg.contains(target)) {
         closeLightbox();
       }
     });
@@ -817,7 +857,7 @@
     function setBrandAndFoot() {
       brand.textContent = state.workMode ? "工作目录" : adapter.normalTitle;
       brand.title = state.workMode ? "点击恢复会话列表" : "点击切换工作目录";
-      sideFoot.textContent = state.workMode ? coverStory.footer : "最近会话";
+      sideFoot.textContent = state.workMode ? coverStory.footer : state.searchMode ? "搜索结果" : adapter.listLabel?.() || "最近会话";
     }
     function updateSearchUi() {
       const supported = Boolean(adapter.searchConversations);
@@ -890,7 +930,7 @@
         </div>`;
       }).join("");
       const moreAvailable = state.searchMode ? Boolean(adapter.searchConversations) : Boolean(adapter.loadMoreConversations);
-      const more = state.listHasMore && moreAvailable ? `<button class="fs-list-more" type="button"${state.listLoading ? " disabled" : ""}>${state.listLoading ? "加载中…" : state.searchMode ? "加载更多结果" : "加载更多话题"}</button>` : "";
+      const more = state.listHasMore && moreAvailable ? `<button class="fs-list-more" type="button"${state.listLoading ? " disabled" : ""}>${state.listLoading ? "加载中…" : state.searchMode ? "加载更多结果" : "加载更多"}</button>` : "";
       list.innerHTML = items + more;
     }
     function renderSidebar() {
@@ -945,6 +985,22 @@
         };
         if (image.complete) markInline();
         else image.addEventListener("load", markInline, { once: true });
+      });
+      root.querySelectorAll(".fs-post-body svg").forEach((svg) => {
+        if (svg.parentElement?.closest("svg")) return;
+        const className = String(svg.getAttribute("class") || "");
+        if (/emoji|icon|avatar/i.test(className)) {
+          svg.classList.add("fs-inline-svg");
+          return;
+        }
+        const rect = svg.getBoundingClientRect();
+        const attributeWidth = Number(svg.getAttribute("width") || 0);
+        const attributeHeight = Number(svg.getAttribute("height") || 0);
+        const viewBox = (svg.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number);
+        const width = rect.width || attributeWidth || viewBox[2] || 0;
+        const height = rect.height || attributeHeight || viewBox[3] || 0;
+        if (width >= 48 && height >= 48) svg.classList.add("fs-thumb-svg");
+        else svg.classList.add("fs-inline-svg");
       });
     }
     async function handleLoadMore(button) {
@@ -1272,6 +1328,13 @@
         }
       }
       const anchor = target?.closest?.("a") ?? null;
+      const svg = target?.closest?.("svg.fs-thumb-svg");
+      if (svg && svg.closest(".fs-post-body")) {
+        event.preventDefault();
+        event.stopPropagation();
+        openSvgLightbox(svg);
+        return;
+      }
       if (!anchor) return;
       const href = anchor.getAttribute("href");
       if (!href || href.startsWith("#")) return;
