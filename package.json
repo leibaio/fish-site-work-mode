@@ -1,6 +1,6 @@
 {
   "name": "fish-site-work-mode",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "private": true,
   "type": "module",
   "description": "多站点工作台：左栏会话/工作目录、中间阅读区、右侧运行日志",

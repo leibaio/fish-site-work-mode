@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  doubanAdapter,
+  galleryItemToConversation,
+  galleryItemView,
   isGroupHome,
   parseGroupList,
   parseTopicPage,
@@ -11,6 +14,11 @@ import {
 function parse(html: string): Document {
   return new DOMParser().parseFromString(html, "text/html");
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  window.history.replaceState({}, "", "/");
+});
 
 const groupHtml = `<!doctype html><html><body>
   <div class="topics">
@@ -111,5 +119,82 @@ describe("Douban adapter", () => {
     expect(reply.title).toBe("话题标题");
     expect(reply.html).toContain("回复一");
     expect(reply.html).toContain("回复者A");
+  });
+
+  it("maps gallery hot items to conversations and views", () => {
+    const item = {
+      target_type: "topic",
+      target: {
+        title: "",
+        abstract: "海住山寺，山城之秋。\n第二段",
+        card_subtitle: "Amber 96赞 · 5回复",
+        create_time: "2026-11-23 20:59:46",
+        uri: "douban://douban.com/group/topic/506590885?_spm_id=abc",
+        owner: {
+          name: "Amber",
+          avatar: "https://img9.doubanio.com/icon/a.jpg",
+        },
+        photos: [
+          { large: { url: "https://img2.doubanio.com/view/group_topic/l/public/p1.jpg" } },
+        ],
+        gallery_topic: { name: "山中风景", uri: "douban://douban.com/gallery/topic/109780" },
+      },
+    };
+
+    const conversation = galleryItemToConversation(
+      item,
+      0,
+      "https://www.douban.com/gallery/",
+    );
+    expect(conversation?.id).toBe("gallery:506590885");
+    expect(conversation?.title).toContain("海住山寺");
+    expect(conversation?.subtitle).toContain("Amber");
+    expect(conversation?.avatar).toBe("https://img9.doubanio.com/icon/a.jpg");
+
+    const view = galleryItemView(item, "https://www.douban.com/gallery/");
+    expect(view.title).toContain("海住山寺");
+    expect(view.html).toContain("第二段");
+    expect(view.html).toContain("https://img2.doubanio.com/view/group_topic/l/public/p1.jpg");
+    expect(view.html).toContain("https://www.douban.com/group/topic/506590885");
+    expect(view.html).toContain("打开原帖");
+  });
+
+  it("loads the gallery feed through the public rexxar api", async () => {
+    window.history.replaceState({}, "", "/gallery/");
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      expect(url.pathname).toBe("/rexxar/api/v2/gallery/hot_items");
+      expect(url.searchParams.get("start")).toBe("0");
+      expect(url.searchParams.get("count")).toBe("20");
+      return new Response(
+        JSON.stringify({
+          start: 0,
+          count: 20,
+          total: 40,
+          items: [
+            {
+              target_type: "topic",
+              target: {
+                abstract: "Gallery item",
+                card_subtitle: "Amber 96赞",
+                create_time: "2026-11-23 20:59:46",
+                uri: "douban://douban.com/group/topic/506590885",
+                owner: { name: "Amber" },
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const page = await doubanAdapter.listConversations();
+    if (Array.isArray(page)) throw new Error("expected a conversation page");
+
+    expect(page.conversations).toHaveLength(1);
+    expect(page.conversations[0].id).toBe("gallery:506590885");
+    expect(page.hasMore).toBe(true);
+    expect(page.cursor).toEqual({ kind: "gallery", start: 1 });
   });
 });

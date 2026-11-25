@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         工作台 · 知乎
 // @namespace    fish-site-work-mode
-// @version      0.9.1
+// @version      0.9.2
 // @description  把知乎变成工作台：左栏回答/推荐、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT

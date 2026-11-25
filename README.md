@@ -20,7 +20,7 @@
 - **中间**：阅读区（正文、帖子、文档）
 - **右侧**：持续滚动的运行日志
 
-目前已实现八个站点适配器：**linux.do**、**V2EX**、**Chiphell**、**虎扑**、**知乎**、**微博**、**豆瓣小组**、**即刻**。剩余 **小红书** 共用 `packages/core`，按 `docs/MODE-BLUEPRINT.md` 里的适配器接口补齐即可。
+目前已实现八个站点适配器：**linux.do**、**V2EX**、**Chiphell**、**虎扑**、**知乎**、**微博**、**豆瓣**、**即刻**。剩余 **小红书** 共用 `packages/core`，按 `docs/MODE-BLUEPRINT.md` 里的适配器接口补齐即可。
 
 ---
 
@@ -61,7 +61,7 @@
 - Chiphell 按 Discuz 分页加载后续楼层，每页约 30 帖
 - 虎扑按帖子分页加载后续楼层，每页约 20 回复
 - **知乎 / 微博使用 live DOM 模式**：只读取当前页面已经渲染出来的回答、推荐卡片或微博，不伪造签名、不请求未授权的跨页数据
-- **豆瓣小组**：`/group/` 读取讨论精选卡片；`/group/topic/<id>/` 读取楼主 + 回复楼层；从精选页打开话题时会先尝试同源 fetch，失败则跳转到话题页由 live DOM 接管
+- **豆瓣**：`/group/` 读取讨论精选；`/group/topic/<id>/` 读取楼主 + 回复楼层；`/gallery/` 通过公开 rexxar API 读取话题精选动态，支持加载更多
 - **即刻**：首页/探索使用推荐流 API，`/following` 使用关注流 API；用户页、话题页、动态详情页使用 live DOM；左栏支持加载更多和搜索
 - 站内链接默认新标签打开，不打断当前阅读
 
@@ -162,7 +162,7 @@ packages/
     weibo/              # 微博（live DOM）适配器
       src/adapter.ts    # 时间线卡片、状态详情、图片/视频
       src/index.ts      # 入口：startApp(weiboAdapter, weiboCoverStory)
-    douban/             # 豆瓣小组适配器
+    douban/             # 豆瓣（小组 + 话题广场）适配器
       src/adapter.ts    # 讨论精选、话题楼主/回复、同源 fetch + 导航回退
       src/index.ts      # 入口：startApp(doubanAdapter, doubanCoverStory)
     jike/               # 即刻（API + live DOM）适配器
@@ -247,15 +247,17 @@ Chiphell 没有公开 JSON API，适配器读取站点自身的 HTML 页面（�
 - 需要先在页面里登录并让内容加载完成；脚本会在挂载后等待最多 6–8 秒
 - 当前页面没有渲染出来的回答/微博不会主动抓取，翻页/无限滚动也不接管
 
-### 豆瓣小组
+### 豆瓣
 
 | 用途 | 路线 |
 | --- | --- |
 | 讨论精选列表 | `/group/` 的 `.channel-item` 卡片（live DOM） |
 | 话题楼主 + 回复 | `/group/topic/<id>/` 的 `.topic-content` / `.comment-item`（live DOM） |
 | 从精选打开话题 | 先同源 `fetch('/group/topic/<id>/')` 解析；失败则跳转到话题页，由 live DOM 接管 |
+| 话题广场 | `GET https://m.douban.com/rexxar/api/v2/gallery/hot_items?start=<n>&count=20` |
+| 话题广场展示 | 摘要、配图、作者、点赞/回复信息、原帖链接 |
 
-豆瓣对未登录/自动化请求比较严格；如果话题页返回 403 或登录页，阅读区会显示错误，不会绕过限制。
+豆瓣对未登录/自动化请求比较严格；如果话题页返回 403 或登录页，阅读区会显示错误，不会绕过限制。话题广场 API 是公开只读接口，不需要登录。
 
 ### 即刻
 
@@ -308,7 +310,7 @@ API 请求使用页面自己已经存在的登录态：
 | 虎扑 | ✅ 可用 | BBS HTML，步行街列表 + 帖子分页 |
 | 知乎 | ✅ 可用（live DOM） | 问题回答 / 首页推荐，只读当前页面已渲染内容 |
 | 微博 | ✅ 可用（live DOM） | 时间线 / 状态详情，只读当前页面已渲染内容 |
-| 豆瓣小组 | ✅ 可用（live DOM） | 讨论精选 / 话题楼主+回复；话题页优先 live DOM |
+| 豆瓣 | ✅ 可用 | 小组讨论 + 话题广场（rexxar API） |
 | 即刻 | ✅ 可用（API + live DOM） | 推荐/关注流 API、搜索、加载更多；详情回退 DOM |
 | 小红书 | 计划 | 需要处理签名接口，优先 DOM + 隐藏详情页路线 |
 
@@ -325,8 +327,8 @@ API 请求使用页面自己已经存在的登录态：
 - 虎扑默认支持步行街主干道（`/bxj`、`/topic-daily`）；帖子页会尝试跟随面包屑里的父版块
 - 知乎 / 微博是 **live DOM**：只能读当前页面已经渲染出来的内容，翻页或无限滚动不会自动接管；未登录或内容未加载时会显示加载失败
 - 知乎文章（`zhuanlan.zhihu.com`）和微博移动版（`m.weibo.cn`）暂未接入，目前分别支持问答/推荐页和 `weibo.com` 时间线
-- 豆瓣目前支持 `/group/` 讨论精选和 `/group/topic/<id>/` 话题页；具体小组页 `/group/<gid>/`、电影/图书/音乐条目页暂未接管
-- 豆瓣从精选页打开话题时，如果同源 fetch 被 403/登录墙拦截，会跳转到话题页，由 live DOM 重新接管
+- 豆瓣目前支持 `/group/` 讨论精选、`/group/topic/<id>/` 话题页、`/gallery/` 与 `/gallery/all` 话题广场；具体小组页 `/group/<gid>/`、`/gallery/mine`、电影/图书/音乐条目页暂未接管
+- 豆瓣从精选页打开话题时，如果同源 fetch 被 403/登录墙拦截，会跳转到话题页，由 live DOM 重新接管；话题广场直接用公开 API 展示摘要和配图
 - 即刻首页/探索使用推荐 API，`/following` 使用关注 API；搜索走即刻搜索接口。API 失效时回退 live DOM + 滚动加载
 - 即刻 API 只使用页面已有的登录 token 做只读 GET；如果 token 过期或 CORS 失败，会回退 DOM 或显示错误
 - Chiphell / 虎扑部分版块或附件需要登录才能查看，权限不足时会显示加载失败
@@ -352,8 +354,8 @@ API 请求使用页面自己已经存在的登录态：
 # 1. 修改 package.json 的 version，并更新 CHANGELOG.md
 npm run check
 git add dist package.json CHANGELOG.md
-git commit -m "chore: release v0.9.2"
-git tag v0.9.2
+git commit -m "chore: release v0.9.3"
+git tag v0.9.3
 git push origin main --tags
 ```
 
@@ -369,7 +371,7 @@ CI 会校验提交的 `dist` 与源码构建结果一致。也可以在 GitHub R
 - [Chiphell](https://www.chiphell.com/)：Discuz 论坛，第三个适配对象
 - [虎扑](https://bbs.hupu.com/)：BBS 社区，第四个适配对象
 - [知乎](https://www.zhihu.com/) / [微博](https://weibo.com/)：live DOM 读取，第五、第六个适配对象
-- [豆瓣小组](https://www.douban.com/group/)：讨论精选 + 话题楼层，第七个适配对象
+- [豆瓣](https://www.douban.com/group/)：小组讨论 + 话题广场，第七个适配对象
 - [即刻](https://web.okjike.com/)：推荐/关注 API + live DOM，第八个适配对象
 - 多站点架构与路线设计见 [docs/MODE-BLUEPRINT.md](docs/MODE-BLUEPRINT.md)
 

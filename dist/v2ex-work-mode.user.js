@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         工作台 · V2EX
 // @namespace    fish-site-work-mode
-// @version      0.9.1
+// @version      0.9.2
 // @description  把 V2EX 变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT

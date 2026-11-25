@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         工作台 · 豆瓣
 // @namespace    fish-site-work-mode
-// @version      0.9.1
-// @description  把豆瓣小组变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。
+// @version      0.9.2
+// @description  把豆瓣小组/话题广场变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT
 // @homepageURL  https://github.com/leibaio/fish-site-work-mode
@@ -13,6 +13,10 @@
 // @match        https://douban.com/group/*
 // @match        https://www.douban.com/group
 // @match        https://douban.com/group
+// @match        https://www.douban.com/gallery/*
+// @match        https://douban.com/gallery/*
+// @match        https://www.douban.com/gallery
+// @match        https://douban.com/gallery
 // @run-at       document-idle
 // @grant        GM_getValue
 // @grant        GM_setValue
@@ -1629,6 +1633,97 @@
     "style",
     "noscript"
   ];
+  var DOUBAN_GALLERY_API = "https://m.douban.com/rexxar/api/v2/gallery/hot_items";
+  function isGalleryPath(pathname) {
+    return pathname === "/gallery" || pathname === "/gallery/" || /^\/gallery\/all\/?$/.test(pathname);
+  }
+  function galleryTopicId(item) {
+    const uri = String(item.target?.uri || "");
+    return uri.match(/\/(?:group\/)?topic\/(\d+)/)?.[1] || null;
+  }
+  function galleryTitle(item) {
+    const target = item.target;
+    const title = String(target?.title || "").trim();
+    if (title) return title;
+    const firstLine = String(target?.abstract || "").split(/\r?\n/)[0].trim();
+    if (firstLine) return firstLine.slice(0, 100);
+    return String(target?.gallery_topic?.name || "豆瓣话题").trim();
+  }
+  function galleryWebUrl(item) {
+    const target = item.target;
+    if (target?.url) return absoluteUrl(target.url, "https://www.douban.com");
+    const uri = String(target?.uri || "");
+    if (uri.startsWith("douban://douban.com/")) {
+      return `https://www.douban.com/${uri.slice("douban://douban.com/".length)}`;
+    }
+    return "";
+  }
+  function galleryItemToConversation(item, index, baseUrl) {
+    const target = item.target;
+    if (!target) return null;
+    const topicId = galleryTopicId(item);
+    const id = topicId ? `gallery:${topicId}` : `gallery:i${index}`;
+    const title = galleryTitle(item);
+    const owner = String(target.owner?.name || "").trim();
+    const subtitle = String(target.card_subtitle || owner || "豆瓣话题").trim();
+    return {
+      id,
+      title: title || owner || "豆瓣话题",
+      subtitle,
+      avatar: absoluteUrl(target.owner?.avatar, baseUrl),
+      avatarFallback: owner || title,
+      updatedAt: parseDoubanTime(target.create_time || target.update_time || "")
+    };
+  }
+  function galleryItemView(item, baseUrl) {
+    const target = item.target || {};
+    const owner = String(target.owner?.name || "豆瓣用户").trim();
+    const title = galleryTitle(item);
+    const created = target.create_time || target.update_time || "";
+    const abstract = String(target.abstract || "").trim();
+    const parts = [];
+    if (abstract) {
+      parts.push(`<p>${escapeHtml(abstract).replace(/\r?\n/g, "<br>")}</p>`);
+    }
+    for (const picture of target.photos ?? []) {
+      const src = absoluteUrl(picture.large?.url || picture.normal?.url, baseUrl);
+      if (src) parts.push(`<p><img src="${escapeAttr(src)}" alt="" loading="lazy"></p>`);
+    }
+    const originalUrl = galleryWebUrl(item);
+    if (originalUrl) {
+      parts.push(
+        `<p><a href="${escapeAttr(originalUrl)}" target="_blank" rel="noreferrer">打开原帖</a></p>`
+      );
+    }
+    const meta = [
+      owner,
+      timeAgo(parseDoubanTime(created)),
+      String(target.card_subtitle || "").trim()
+    ].filter(Boolean).join(" · ");
+    return {
+      title,
+      subtitle: meta || "豆瓣话题",
+      html: `<h1 class="fs-topic-title">${escapeHtml(title)}</h1><div class="fs-topic-meta">${escapeHtml(meta || "豆瓣话题")}</div>` + createPost(
+        owner,
+        absoluteUrl(target.owner?.avatar, baseUrl),
+        "话题",
+        created,
+        parts.join("") || "<p></p>"
+      ),
+      hasMore: false
+    };
+  }
+  async function fetchGalleryItems(start) {
+    const url = new URL(DOUBAN_GALLERY_API);
+    url.searchParams.set("start", String(start));
+    url.searchParams.set("count", "20");
+    const response = await fetch(url.href, {
+      credentials: "include",
+      headers: { accept: "application/json" }
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  }
   function parseDoubanTime(value) {
     const text = normalizeText(value);
     if (!text) return 0;
@@ -1720,7 +1815,7 @@
     return url.pathname === "/group" || url.pathname === "/group/";
   }
   function isSupportedPath(url) {
-    return isGroupHome(url) || topicIdFromUrl(url) !== null;
+    return isGalleryPath(url.pathname) || isGroupHome(url) || topicIdFromUrl(url) !== null;
   }
   function parseGroupList(doc, baseUrl) {
     const items = topLevel(
@@ -1897,6 +1992,8 @@
   }
   var replyElements = /* @__PURE__ */ new Map();
   var topicContext = null;
+  var galleryItems = /* @__PURE__ */ new Map();
+  var currentListLabel = "最近会话";
   function liveTopicContext() {
     const topicId = topicIdFromUrl(new URL(location.href));
     if (!topicId) throw new Error("当前不是豆瓣小组话题页");
@@ -1910,6 +2007,9 @@
     id: "douban",
     label: "豆瓣",
     normalTitle: "微信",
+    listLabel() {
+      return currentListLabel;
+    },
     match(url) {
       return url.hostname === "douban.com" || url.hostname === "www.douban.com";
     },
@@ -1919,7 +2019,7 @@
       const topicId = topicIdFromUrl(url);
       return {
         url: location.href,
-        canonicalId: topicId ? `topic:${topicId}` : "group",
+        canonicalId: isGalleryPath(url.pathname) ? "gallery" : topicId ? `topic:${topicId}` : "group",
         title: document.title
       };
     },
@@ -1931,8 +2031,37 @@
     async listConversations() {
       replyElements = /* @__PURE__ */ new Map();
       topicContext = null;
+      galleryItems = /* @__PURE__ */ new Map();
       const url = new URL(location.href);
       const topicId = topicIdFromUrl(url);
+      if (isGalleryPath(url.pathname)) {
+        currentListLabel = "话题精选";
+        try {
+          const data = await fetchGalleryItems(0);
+          const items = Array.isArray(data.items) ? data.items : [];
+          const conversations = [];
+          for (const [index, item] of items.entries()) {
+            const conversation = galleryItemToConversation(item, index, location.href);
+            if (!conversation) continue;
+            conversations.push(conversation);
+            galleryItems.set(conversation.id, item);
+          }
+          if (conversations.length) {
+            const start = Number(data.start) || 0;
+            const next = start + items.length;
+            const total = Number(data.total) || next;
+            return {
+              conversations,
+              hasMore: next < total,
+              cursor: { kind: "gallery", start: next }
+            };
+          }
+        } catch (error) {
+          console.info("[工作台][豆瓣] 话题广场 API 不可用", error);
+        }
+        throw new Error("未找到豆瓣话题广场内容（可能需要登录）");
+      }
+      currentListLabel = topicId ? "讨论" : "讨论精选";
       if (!topicId) {
         await waitForSelector([".channel-item", ".topics .channel-item"], 6e3);
         const conversations = parseGroupList(document, location.href);
@@ -1963,7 +2092,38 @@
         ...replies
       ];
     },
+    async loadMoreConversations(cursor) {
+      if (cursor && typeof cursor === "object" && "kind" in cursor && cursor.kind === "gallery") {
+        const start = Number(cursor.start) || 0;
+        const data = await fetchGalleryItems(start);
+        const items = Array.isArray(data.items) ? data.items : [];
+        const conversations = [];
+        for (const [index, item] of items.entries()) {
+          const conversation = galleryItemToConversation(
+            item,
+            index + start,
+            location.href
+          );
+          if (!conversation) continue;
+          conversations.push(conversation);
+          galleryItems.set(conversation.id, item);
+        }
+        const next = (Number(data.start) || start) + items.length;
+        const total = Number(data.total) || next;
+        return {
+          conversations,
+          hasMore: next < total,
+          cursor: { kind: "gallery", start: next }
+        };
+      }
+      return { conversations: [], hasMore: false, cursor };
+    },
     async openConversation(id) {
+      if (id.startsWith("gallery:")) {
+        const item = galleryItems.get(id);
+        if (!item) throw new Error("话题不在当前列表，请刷新豆瓣话题广场");
+        return galleryItemView(item, location.href);
+      }
       const url = new URL(location.href);
       const liveTopicId = topicIdFromUrl(url);
       if (id.startsWith("reply:")) {

@@ -45,8 +45,12 @@ const sites = {
       "https://douban.com/group/*",
       "https://www.douban.com/group",
       "https://douban.com/group",
+      "https://www.douban.com/gallery/*",
+      "https://douban.com/gallery/*",
+      "https://www.douban.com/gallery",
+      "https://douban.com/gallery",
     ],
-    description: "把豆瓣小组变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。",
+    description: "把豆瓣小组/话题广场变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。",
   },
   jike: {
     name: "工作台 · 即刻",
