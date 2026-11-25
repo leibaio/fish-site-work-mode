@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.9.3 — 2026-11-25
+
+豆瓣话题详情页与话题广场子话题支持。
+
+### 新增
+
+- `/topic/<id>` 个人/小组话题详情页：
+  - 读取标题、正文、楼主、头像、时间
+  - 读取 `#comments` 下 `[data-cid]` 回复楼层
+  - @match 增加 `/topic/*`
+- `/gallery/topic/<id>` 话题广场子话题页：
+  - 读取 `.topic-title`、`.topic-abstract`
+  - 把 `#topics-app` 当前标签下的精选内容作为话题文档展示
+  - 话题广场卡片里的「话题：xxx」链接会跳到对应子话题页
+- 正文清洗时移除 `.user-face`，避免话题页作者头像重复出现在正文里
+- 新增 `/topic` 解析、gallery topic 视图和 URL 测试，测试总数 57
+
+### 说明
+
+- `https://www.douban.com/topic` 本身服务端返回 404（没有可解析的页面）；支持的是 `/topic/<id>` 详情页
+- `/topic/<id>` 与 `/gallery/topic/<id>` 是两套不同的 ID 空间
+
 ## 0.9.2 — 2026-11-25
 
 豆瓣话题广场支持，以及即刻 API 方法修正。

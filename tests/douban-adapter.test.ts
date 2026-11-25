@@ -3,9 +3,12 @@ import {
   doubanAdapter,
   galleryItemToConversation,
   galleryItemView,
+  galleryTopicIdFromUrl,
+  galleryTopicView,
   isGroupHome,
   parseGroupList,
   parseTopicPage,
+  personalTopicIdFromUrl,
   replyView,
   topicIdFromUrl,
   topicView,
@@ -74,6 +77,10 @@ describe("Douban adapter", () => {
     expect(topicIdFromUrl(new URL("https://www.douban.com/group/topic/506267390/"))).toBe("506267390");
     expect(topicIdFromUrl(new URL("https://www.douban.com/group/topic/506267390"))).toBe("506267390");
     expect(topicIdFromUrl(new URL("https://www.douban.com/group/"))).toBeNull();
+    expect(personalTopicIdFromUrl(new URL("https://www.douban.com/topic/506341158"))).toBe("506341158");
+    expect(personalTopicIdFromUrl(new URL("https://www.douban.com/group/topic/506341158"))).toBeNull();
+    expect(galleryTopicIdFromUrl(new URL("https://www.douban.com/gallery/topic/109780"))).toBe("109780");
+    expect(galleryTopicIdFromUrl(new URL("https://www.douban.com/gallery/"))).toBeNull();
   });
 
   it("maps group homepage cards to conversations", () => {
@@ -196,5 +203,50 @@ describe("Douban adapter", () => {
     expect(page.conversations[0].id).toBe("gallery:506590885");
     expect(page.hasMore).toBe(true);
     expect(page.cursor).toEqual({ kind: "gallery", start: 1 });
+  });
+
+  it("parses /topic style replies and removes author avatars from the body", () => {
+    const topic = parseTopicPage(
+      parse(`<div id="content">
+        <h1>个人话题标题</h1>
+        <div class="topic-content">
+          <div class="user-face"><img src="https://img1.doubanio.com/a.jpg"></div>
+          <p>话题正文</p>
+        </div>
+        <ul id="comments">
+          <li class="comment-item reply-item" data-cid="9001">
+            <div class="user-face"><img src="https://img1.doubanio.com/b.jpg"></div>
+            <div class="reply-doc">
+              <h4><a href="/people/alice/">Alice</a><span class="pubtime">2026-11-21 12:42:06</span></h4>
+              <div class="reply-content"><p>回复内容</p></div>
+            </div>
+          </li>
+        </ul>
+      </div>`),
+      "https://www.douban.com/topic/506341158",
+      "506341158",
+    );
+
+    expect(topic.title).toBe("个人话题标题");
+    expect(topic.bodyHtml).toContain("话题正文");
+    expect(topic.bodyHtml).not.toContain("user-face");
+    expect(topic.replies).toHaveLength(1);
+    expect(topic.replies[0].author).toBe("Alice");
+    expect(topic.replies[0].content).toContain("回复内容");
+  });
+
+  it("renders a gallery topic page header and feed", () => {
+    const view = galleryTopicView(
+      parse(`<div class="gallery-hd">
+        <h1 class="topic-title">山中风景</h1>
+        <p class="topic-abstract">每个人都去过山里</p>
+      </div>
+      <div id="topics-app"><div class="topic-item">话题下的精选内容</div></div>`),
+      "https://www.douban.com/gallery/topic/109780",
+    );
+
+    expect(view.title).toBe("山中风景");
+    expect(view.subtitle).toContain("每个人都去过山里");
+    expect(view.html).toContain("话题下的精选内容");
   });
 });

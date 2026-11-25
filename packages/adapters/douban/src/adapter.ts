@@ -28,6 +28,9 @@ const REMOVE_UI = [
   ".topic-actions",
   ".comment-operations",
   ".reply-actions",
+  ".user-face",
+  ".loader",
+  ".skeleton",
   "script",
   "style",
   "noscript",
@@ -90,14 +93,19 @@ function galleryTitle(item: DoubanGalleryItem): string {
   return String(target?.gallery_topic?.name || "豆瓣话题").trim();
 }
 
+function doubanWebUrl(uri?: string): string {
+  const value = String(uri || "");
+  if (!value) return "";
+  if (value.startsWith("douban://douban.com/")) {
+    return `https://www.douban.com/${value.slice("douban://douban.com/".length)}`;
+  }
+  return value;
+}
+
 function galleryWebUrl(item: DoubanGalleryItem): string {
   const target = item.target;
   if (target?.url) return absoluteUrl(target.url, "https://www.douban.com");
-  const uri = String(target?.uri || "");
-  if (uri.startsWith("douban://douban.com/")) {
-    return `https://www.douban.com/${uri.slice("douban://douban.com/".length)}`;
-  }
-  return "";
+  return doubanWebUrl(target?.uri);
 }
 
 export function galleryItemToConversation(
@@ -143,6 +151,14 @@ export function galleryItemView(item: DoubanGalleryItem, baseUrl: string): Conte
       `<p><a href="${escapeAttr(originalUrl)}" target="_blank" rel="noreferrer">打开原帖</a></p>`,
     );
   }
+  const galleryTopicUrl = doubanWebUrl(target.gallery_topic?.uri);
+  if (galleryTopicUrl) {
+    parts.push(
+      `<p><a href="${escapeAttr(galleryTopicUrl)}" target="_blank" rel="noreferrer">话题：${escapeHtml(
+        target.gallery_topic?.name || "查看话题",
+      )}</a></p>`,
+    );
+  }
 
   const meta = [
     owner,
@@ -165,6 +181,39 @@ export function galleryItemView(item: DoubanGalleryItem, baseUrl: string): Conte
         created,
         parts.join("") || "<p></p>",
       ),
+    hasMore: false,
+  };
+}
+
+export function galleryTopicView(doc: Document, baseUrl: string): ContentView {
+  const title =
+    firstText(doc, [
+      ".gallery-hd .topic-title",
+      ".topic-title",
+      "#content h1",
+      "h1",
+    ]) || "豆瓣话题";
+  const abstract = firstText(doc, [
+    ".gallery-hd .topic-abstract",
+    ".topic-abstract",
+  ]);
+  const feed = doc.querySelector("#topics-app");
+  const feedHtml = cleanElement(feed, baseUrl, REMOVE_UI);
+  const content = [
+    abstract ? `<p>${escapeHtml(abstract)}</p>` : "",
+    feedHtml,
+  ]
+    .filter(Boolean)
+    .join("");
+  const meta = abstract || "豆瓣话题";
+
+  return {
+    title,
+    subtitle: meta,
+    html:
+      `<h1 class="fs-topic-title">${escapeHtml(title)}</h1>` +
+      `<div class="fs-topic-meta">${escapeHtml(meta)}</div>` +
+      createPost("豆瓣话题", "", "话题", "", content || "<p></p>"),
     hasMore: false,
   };
 }
@@ -284,12 +333,30 @@ export function topicIdFromUrl(url: URL): string | null {
   return url.pathname.match(/^\/group\/topic\/(\d+)(?:\/|$)/)?.[1] || null;
 }
 
+export function personalTopicIdFromUrl(url: URL): string | null {
+  return url.pathname.match(/^\/topic\/(\d+)(?:\/|$)/)?.[1] || null;
+}
+
+export function galleryTopicIdFromUrl(url: URL): string | null {
+  return url.pathname.match(/^\/gallery\/topic\/(\d+)(?:\/|$)/)?.[1] || null;
+}
+
+function liveTopicIdFromUrl(url: URL): string | null {
+  return topicIdFromUrl(url) || personalTopicIdFromUrl(url);
+}
+
 export function isGroupHome(url: URL): boolean {
   return url.pathname === "/group" || url.pathname === "/group/";
 }
 
 function isSupportedPath(url: URL): boolean {
-  return isGalleryPath(url.pathname) || isGroupHome(url) || topicIdFromUrl(url) !== null;
+  return (
+    isGalleryPath(url.pathname) ||
+    galleryTopicIdFromUrl(url) !== null ||
+    isGroupHome(url) ||
+    topicIdFromUrl(url) !== null ||
+    personalTopicIdFromUrl(url) !== null
+  );
 }
 
 export function parseGroupList(doc: Document, baseUrl: string): Conversation[] {
@@ -539,8 +606,8 @@ let galleryItems = new Map<string, DoubanGalleryItem>();
 let currentListLabel = "最近会话";
 
 function liveTopicContext(): DoubanTopicContext {
-  const topicId = topicIdFromUrl(new URL(location.href));
-  if (!topicId) throw new Error("当前不是豆瓣小组话题页");
+  const topicId = liveTopicIdFromUrl(new URL(location.href));
+  if (!topicId) throw new Error("当前不是豆瓣话题页");
   if (topicContext?.topicId === topicId) return topicContext;
   const context = parseTopicPage(document, location.href, topicId);
   topicContext = context;
@@ -565,13 +632,19 @@ export const doubanAdapter: SiteAdapter = {
     const url = new URL(location.href);
     if (!this.match(url) || !isSupportedPath(url)) return null;
     const topicId = topicIdFromUrl(url);
+    const personalTopicId = personalTopicIdFromUrl(url);
+    const galleryTopicId = galleryTopicIdFromUrl(url);
     return {
       url: location.href,
       canonicalId: isGalleryPath(url.pathname)
         ? "gallery"
-        : topicId
-          ? `topic:${topicId}`
-          : "group",
+        : galleryTopicId
+          ? `gallery-topic:${galleryTopicId}`
+          : personalTopicId
+            ? `topic:${personalTopicId}`
+            : topicId
+              ? `topic:${topicId}`
+              : "group",
       title: document.title,
     };
   },
@@ -579,7 +652,10 @@ export const doubanAdapter: SiteAdapter = {
   autoOpenFirst: false,
 
   initialConversationId(): string | null {
-    const topicId = topicIdFromUrl(new URL(location.href));
+    const url = new URL(location.href);
+    const galleryTopicId = galleryTopicIdFromUrl(url);
+    if (galleryTopicId) return `gallery-topic:${galleryTopicId}`;
+    const topicId = liveTopicIdFromUrl(url);
     return topicId ? `topic:${topicId}` : null;
   },
 
@@ -589,6 +665,43 @@ export const doubanAdapter: SiteAdapter = {
     galleryItems = new Map();
     const url = new URL(location.href);
     const topicId = topicIdFromUrl(url);
+    const personalTopicId = personalTopicIdFromUrl(url);
+    const galleryTopicId = galleryTopicIdFromUrl(url);
+    const liveTopicId = topicId || personalTopicId;
+
+    if (galleryTopicId) {
+      currentListLabel = "话题";
+      await waitForSelector(
+        [".gallery-hd .topic-title", ".topic-title", "#content h1", "#topics-app"],
+        8000,
+      );
+      await waitForSelector(
+        [
+          "#topics-app a[href*='/topic/']",
+          "#topics-app a[href*='/group/topic/']",
+          "#topics-app img",
+          "#topics-app article",
+          "#topics-app .topic-item",
+        ],
+        3500,
+      );
+      const title =
+        firstText(document, [".gallery-hd .topic-title", ".topic-title", "#content h1", "h1"]) ||
+        "豆瓣话题";
+      const abstract = firstText(document, [
+        ".gallery-hd .topic-abstract",
+        ".topic-abstract",
+      ]);
+      return [
+        {
+          id: `gallery-topic:${galleryTopicId}`,
+          title,
+          subtitle: abstract || "豆瓣话题",
+          avatarFallback: title,
+          updatedAt: 0,
+        },
+      ];
+    }
 
     if (isGalleryPath(url.pathname)) {
       currentListLabel = "话题精选";
@@ -618,9 +731,9 @@ export const doubanAdapter: SiteAdapter = {
       throw new Error("未找到豆瓣话题广场内容（可能需要登录）");
     }
 
-    currentListLabel = topicId ? "讨论" : "讨论精选";
+    currentListLabel = liveTopicId ? "讨论" : "讨论精选";
 
-    if (!topicId) {
+    if (!liveTopicId) {
       await waitForSelector([".channel-item", ".topics .channel-item"], 6000);
       const conversations = parseGroupList(document, location.href);
       if (conversations.length) return conversations;
@@ -642,7 +755,7 @@ export const doubanAdapter: SiteAdapter = {
 
     return [
       {
-        id: `topic:${topicId}`,
+        id: `topic:${liveTopicId}`,
         title: topic.title,
         subtitle: [topic.author, timeAgo(parseDoubanTime(topic.timeText)), "楼主"]
           .filter(Boolean)
@@ -694,8 +807,31 @@ export const doubanAdapter: SiteAdapter = {
       return galleryItemView(item, location.href);
     }
 
+    if (id.startsWith("gallery-topic:")) {
+      const galleryTopicId = galleryTopicIdFromUrl(new URL(location.href));
+      if (galleryTopicId && id === `gallery-topic:${galleryTopicId}`) {
+        return galleryTopicView(document, location.href);
+      }
+      const topicId = id.slice("gallery-topic:".length);
+      try {
+        const response = await fetch(`/gallery/topic/${encodeURIComponent(topicId)}/`, {
+          credentials: "include",
+          headers: { accept: "text/html,application/xhtml+xml" },
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const html = await response.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        return galleryTopicView(
+          doc,
+          response.url || new URL(`/gallery/topic/${topicId}/`, location.href).href,
+        );
+      } catch {
+        throw new Error("无法读取豆瓣话题");
+      }
+    }
+
     const url = new URL(location.href);
-    const liveTopicId = topicIdFromUrl(url);
+    const liveTopicId = liveTopicIdFromUrl(url);
 
     if (id.startsWith("reply:")) {
       if (!liveTopicId) throw new Error("回复只能在豆瓣话题页打开");
@@ -715,6 +851,21 @@ export const doubanAdapter: SiteAdapter = {
       const parsed = parseTopicPage(fetched.doc, fetched.url, topicId);
       return topicView(parsed);
     } catch {
+      try {
+        const response = await fetch(`/topic/${encodeURIComponent(topicId)}`, {
+          credentials: "include",
+          headers: { accept: "text/html,application/xhtml+xml" },
+        });
+        if (response.ok) {
+          const html = await response.text();
+          const doc = new DOMParser().parseFromString(html, "text/html");
+          if (doc.querySelector(".topic-content, #comments, h1")) {
+            return topicView(parseTopicPage(doc, response.url || location.href, topicId));
+          }
+        }
+      } catch {
+        // 尝试页面跳转
+      }
       const target = `${location.origin}/group/topic/${encodeURIComponent(topicId)}/`;
       if (location.href !== target) {
         location.assign(target);

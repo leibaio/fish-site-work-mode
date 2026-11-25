@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         工作台 · 即刻
 // @namespace    fish-site-work-mode
-// @version      0.9.2
+// @version      0.9.3
 // @description  把即刻变成工作台：左栏动态、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT

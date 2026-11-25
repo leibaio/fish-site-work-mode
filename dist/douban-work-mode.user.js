@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         工作台 · 豆瓣
 // @namespace    fish-site-work-mode
-// @version      0.9.2
+// @version      0.9.3
 // @description  把豆瓣小组/话题广场变成工作台：左栏话题、中间阅读区、右侧运行日志，支持工作目录伪装。
 // @author       leibaio
 // @license      MIT
@@ -17,6 +17,10 @@
 // @match        https://douban.com/gallery/*
 // @match        https://www.douban.com/gallery
 // @match        https://douban.com/gallery
+// @match        https://www.douban.com/topic/*
+// @match        https://douban.com/topic/*
+// @match        https://www.douban.com/topic
+// @match        https://douban.com/topic
 // @run-at       document-idle
 // @grant        GM_getValue
 // @grant        GM_setValue
@@ -1629,6 +1633,9 @@
     ".topic-actions",
     ".comment-operations",
     ".reply-actions",
+    ".user-face",
+    ".loader",
+    ".skeleton",
     "script",
     "style",
     "noscript"
@@ -1649,14 +1656,18 @@
     if (firstLine) return firstLine.slice(0, 100);
     return String(target?.gallery_topic?.name || "豆瓣话题").trim();
   }
+  function doubanWebUrl(uri) {
+    const value = String(uri || "");
+    if (!value) return "";
+    if (value.startsWith("douban://douban.com/")) {
+      return `https://www.douban.com/${value.slice("douban://douban.com/".length)}`;
+    }
+    return value;
+  }
   function galleryWebUrl(item) {
     const target = item.target;
     if (target?.url) return absoluteUrl(target.url, "https://www.douban.com");
-    const uri = String(target?.uri || "");
-    if (uri.startsWith("douban://douban.com/")) {
-      return `https://www.douban.com/${uri.slice("douban://douban.com/".length)}`;
-    }
-    return "";
+    return doubanWebUrl(target?.uri);
   }
   function galleryItemToConversation(item, index, baseUrl) {
     const target = item.target;
@@ -1695,6 +1706,14 @@
         `<p><a href="${escapeAttr(originalUrl)}" target="_blank" rel="noreferrer">打开原帖</a></p>`
       );
     }
+    const galleryTopicUrl = doubanWebUrl(target.gallery_topic?.uri);
+    if (galleryTopicUrl) {
+      parts.push(
+        `<p><a href="${escapeAttr(galleryTopicUrl)}" target="_blank" rel="noreferrer">话题：${escapeHtml(
+          target.gallery_topic?.name || "查看话题"
+        )}</a></p>`
+      );
+    }
     const meta = [
       owner,
       timeAgo(parseDoubanTime(created)),
@@ -1710,6 +1729,31 @@
         created,
         parts.join("") || "<p></p>"
       ),
+      hasMore: false
+    };
+  }
+  function galleryTopicView(doc, baseUrl) {
+    const title = firstText(doc, [
+      ".gallery-hd .topic-title",
+      ".topic-title",
+      "#content h1",
+      "h1"
+    ]) || "豆瓣话题";
+    const abstract = firstText(doc, [
+      ".gallery-hd .topic-abstract",
+      ".topic-abstract"
+    ]);
+    const feed = doc.querySelector("#topics-app");
+    const feedHtml = cleanElement(feed, baseUrl, REMOVE_UI);
+    const content = [
+      abstract ? `<p>${escapeHtml(abstract)}</p>` : "",
+      feedHtml
+    ].filter(Boolean).join("");
+    const meta = abstract || "豆瓣话题";
+    return {
+      title,
+      subtitle: meta,
+      html: `<h1 class="fs-topic-title">${escapeHtml(title)}</h1><div class="fs-topic-meta">${escapeHtml(meta)}</div>` + createPost("豆瓣话题", "", "话题", "", content || "<p></p>"),
       hasMore: false
     };
   }
@@ -1811,11 +1855,20 @@
   function topicIdFromUrl(url) {
     return url.pathname.match(/^\/group\/topic\/(\d+)(?:\/|$)/)?.[1] || null;
   }
+  function personalTopicIdFromUrl(url) {
+    return url.pathname.match(/^\/topic\/(\d+)(?:\/|$)/)?.[1] || null;
+  }
+  function galleryTopicIdFromUrl(url) {
+    return url.pathname.match(/^\/gallery\/topic\/(\d+)(?:\/|$)/)?.[1] || null;
+  }
+  function liveTopicIdFromUrl(url) {
+    return topicIdFromUrl(url) || personalTopicIdFromUrl(url);
+  }
   function isGroupHome(url) {
     return url.pathname === "/group" || url.pathname === "/group/";
   }
   function isSupportedPath(url) {
-    return isGalleryPath(url.pathname) || isGroupHome(url) || topicIdFromUrl(url) !== null;
+    return isGalleryPath(url.pathname) || galleryTopicIdFromUrl(url) !== null || isGroupHome(url) || topicIdFromUrl(url) !== null || personalTopicIdFromUrl(url) !== null;
   }
   function parseGroupList(doc, baseUrl) {
     const items = topLevel(
@@ -1995,8 +2048,8 @@
   var galleryItems = /* @__PURE__ */ new Map();
   var currentListLabel = "最近会话";
   function liveTopicContext() {
-    const topicId = topicIdFromUrl(new URL(location.href));
-    if (!topicId) throw new Error("当前不是豆瓣小组话题页");
+    const topicId = liveTopicIdFromUrl(new URL(location.href));
+    if (!topicId) throw new Error("当前不是豆瓣话题页");
     if (topicContext?.topicId === topicId) return topicContext;
     const context = parseTopicPage(document, location.href, topicId);
     topicContext = context;
@@ -2017,15 +2070,20 @@
       const url = new URL(location.href);
       if (!this.match(url) || !isSupportedPath(url)) return null;
       const topicId = topicIdFromUrl(url);
+      const personalTopicId = personalTopicIdFromUrl(url);
+      const galleryTopicId2 = galleryTopicIdFromUrl(url);
       return {
         url: location.href,
-        canonicalId: isGalleryPath(url.pathname) ? "gallery" : topicId ? `topic:${topicId}` : "group",
+        canonicalId: isGalleryPath(url.pathname) ? "gallery" : galleryTopicId2 ? `gallery-topic:${galleryTopicId2}` : personalTopicId ? `topic:${personalTopicId}` : topicId ? `topic:${topicId}` : "group",
         title: document.title
       };
     },
     autoOpenFirst: false,
     initialConversationId() {
-      const topicId = topicIdFromUrl(new URL(location.href));
+      const url = new URL(location.href);
+      const galleryTopicId2 = galleryTopicIdFromUrl(url);
+      if (galleryTopicId2) return `gallery-topic:${galleryTopicId2}`;
+      const topicId = liveTopicIdFromUrl(url);
       return topicId ? `topic:${topicId}` : null;
     },
     async listConversations() {
@@ -2034,6 +2092,40 @@
       galleryItems = /* @__PURE__ */ new Map();
       const url = new URL(location.href);
       const topicId = topicIdFromUrl(url);
+      const personalTopicId = personalTopicIdFromUrl(url);
+      const galleryTopicId2 = galleryTopicIdFromUrl(url);
+      const liveTopicId = topicId || personalTopicId;
+      if (galleryTopicId2) {
+        currentListLabel = "话题";
+        await waitForSelector(
+          [".gallery-hd .topic-title", ".topic-title", "#content h1", "#topics-app"],
+          8e3
+        );
+        await waitForSelector(
+          [
+            "#topics-app a[href*='/topic/']",
+            "#topics-app a[href*='/group/topic/']",
+            "#topics-app img",
+            "#topics-app article",
+            "#topics-app .topic-item"
+          ],
+          3500
+        );
+        const title = firstText(document, [".gallery-hd .topic-title", ".topic-title", "#content h1", "h1"]) || "豆瓣话题";
+        const abstract = firstText(document, [
+          ".gallery-hd .topic-abstract",
+          ".topic-abstract"
+        ]);
+        return [
+          {
+            id: `gallery-topic:${galleryTopicId2}`,
+            title,
+            subtitle: abstract || "豆瓣话题",
+            avatarFallback: title,
+            updatedAt: 0
+          }
+        ];
+      }
       if (isGalleryPath(url.pathname)) {
         currentListLabel = "话题精选";
         try {
@@ -2061,8 +2153,8 @@
         }
         throw new Error("未找到豆瓣话题广场内容（可能需要登录）");
       }
-      currentListLabel = topicId ? "讨论" : "讨论精选";
-      if (!topicId) {
+      currentListLabel = liveTopicId ? "讨论" : "讨论精选";
+      if (!liveTopicId) {
         await waitForSelector([".channel-item", ".topics .channel-item"], 6e3);
         const conversations = parseGroupList(document, location.href);
         if (conversations.length) return conversations;
@@ -2082,7 +2174,7 @@
       );
       return [
         {
-          id: `topic:${topicId}`,
+          id: `topic:${liveTopicId}`,
           title: topic.title,
           subtitle: [topic.author, timeAgo(parseDoubanTime(topic.timeText)), "楼主"].filter(Boolean).join(" · "),
           avatar: topic.avatar,
@@ -2124,8 +2216,30 @@
         if (!item) throw new Error("话题不在当前列表，请刷新豆瓣话题广场");
         return galleryItemView(item, location.href);
       }
+      if (id.startsWith("gallery-topic:")) {
+        const galleryTopicId2 = galleryTopicIdFromUrl(new URL(location.href));
+        if (galleryTopicId2 && id === `gallery-topic:${galleryTopicId2}`) {
+          return galleryTopicView(document, location.href);
+        }
+        const topicId2 = id.slice("gallery-topic:".length);
+        try {
+          const response = await fetch(`/gallery/topic/${encodeURIComponent(topicId2)}/`, {
+            credentials: "include",
+            headers: { accept: "text/html,application/xhtml+xml" }
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const html = await response.text();
+          const doc = new DOMParser().parseFromString(html, "text/html");
+          return galleryTopicView(
+            doc,
+            response.url || new URL(`/gallery/topic/${topicId2}/`, location.href).href
+          );
+        } catch {
+          throw new Error("无法读取豆瓣话题");
+        }
+      }
       const url = new URL(location.href);
-      const liveTopicId = topicIdFromUrl(url);
+      const liveTopicId = liveTopicIdFromUrl(url);
       if (id.startsWith("reply:")) {
         if (!liveTopicId) throw new Error("回复只能在豆瓣话题页打开");
         const topic = liveTopicContext();
@@ -2142,6 +2256,20 @@
         const parsed = parseTopicPage(fetched.doc, fetched.url, topicId);
         return topicView(parsed);
       } catch {
+        try {
+          const response = await fetch(`/topic/${encodeURIComponent(topicId)}`, {
+            credentials: "include",
+            headers: { accept: "text/html,application/xhtml+xml" }
+          });
+          if (response.ok) {
+            const html = await response.text();
+            const doc = new DOMParser().parseFromString(html, "text/html");
+            if (doc.querySelector(".topic-content, #comments, h1")) {
+              return topicView(parseTopicPage(doc, response.url || location.href, topicId));
+            }
+          }
+        } catch {
+        }
         const target = `${location.origin}/group/topic/${encodeURIComponent(topicId)}/`;
         if (location.href !== target) {
           location.assign(target);
